@@ -32,8 +32,6 @@ async function main(): Promise<void> {
     maxRetries: 0,
   });
 
-  // TODO (фінальна перевірка): після реалізації cli.ts виконати контрольований
-  // smoke-запит і підтвердити, що adapter повертає лише текст та фактичну модель.
   const client: ChatClient = {
     create: async (request) => {
       const response = await openai.chat.completions.create(request);
