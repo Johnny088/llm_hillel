@@ -8,8 +8,8 @@ import {
   OPENROUTER_REASONING_EFFORTS,
 } from "../src/cli.js";
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const environmentExamplePath = resolve(root, ".env.example");
+const solutionRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const environmentExamplePath = resolve(solutionRoot, ".env.example");
 
 describe("Безкоштовна модель з нульовою вартістю", () => {
   it("дефолтна модель помічена як безкоштовний тариф OpenRouter (:free)", () => {
