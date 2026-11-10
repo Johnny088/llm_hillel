@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "sourceMap": true,
+    "rootDir": "./lesson-01-intro/solution/src",
+    "outDir": "./dist/lesson-01-intro"
+  },
+  "include": ["lesson-01-intro/solution/src/**/*.ts"],
+  "exclude": ["lesson-01-intro/solution/tests/**/*.ts"]
+}

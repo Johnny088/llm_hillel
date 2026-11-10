@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "sourceMap": true,
+    "rootDir": "./lesson-01-intro-openrouter/solution/src",
+    "outDir": "./dist/lesson-01-intro-openrouter"
+  },
+  "include": ["lesson-01-intro-openrouter/solution/src/**/*.ts"],
+  "exclude": ["lesson-01-intro-openrouter/solution/tests/**/*.ts"]
+}
