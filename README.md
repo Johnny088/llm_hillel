@@ -170,8 +170,8 @@ lesson-15-final-project-workshop/
 
 - [Lesson 01 — OpenAI](lesson-01-intro/) — одноразовий CLI-запит через
   Responses API з покроковим запуском і видимим результатом у PowerShell.
-- [Lesson 01 — OpenRouter](lesson-01-intro-openrouter/) — безкоштовна
-  OpenAI-сумісна альтернатива з окремими `starter`, `solution`, тестами та
+- [Lesson 01 — OpenRouter](lesson-01-intro-openrouter/) — OpenAI-сумісний
+  приклад із DeepSeek V4 Flash, окремими `starter`, `solution`, тестами та
   production build.
 - [Lesson 02 — OpenAI](lesson-02-llm-api/) — Express Backend API, Structured
   Outputs, streaming, usage metrics, eval dataset і однокомандна демонстрація.
@@ -333,17 +333,16 @@ yarn check:solution
 PowerShell:
 
 ```powershell
-if (-not (Test-Path .env)) { Copy-Item .env.example .env }
+yarn env:init
 ```
 
-Bash:
+`yarn env:init` створює спільний кореневий `./.env` лише за його відсутності;
+наявні налаштування не перезаписуються. Усі практики читають цей файл, а
+зовнішні змінні процесу мають пріоритет над ним.
 
-```bash
-cp .env.example .env
-```
-
-Заповнюються лише model IDs і секретний API key; числові значення вже мають
-безпечні навчальні defaults:
+Заповнюються потрібні для обраної практики змінні та секретний API key. Для
+Lesson 01 OpenRouter початкові значення – модель `~deepseek/deepseek-v4-flash-latest`,
+`OPENROUTER_REASONING_EFFORT=low` і `OPENROUTER_MAX_OUTPUT_TOKENS=1600`:
 
 ```dotenv
 OPENAI_API_KEY=
@@ -387,9 +386,9 @@ LESSON15_PORT=3015
 
 `LESSON13_OPENROUTER_ADMIN_DATABASE_URL` потрібен лише для локальних міграцій і setup checkpoint schemas. Сервіси агентів використовують `LESSON13_OPENROUTER_AGENT_DATABASE_URL` з обмеженою роллю `catalog_agent_runtime`.
 
-Файл `.env` не додається до Git. Lesson 01 може використовувати власний
-локальний env-файл; починаючи з Lesson 02, усі OpenRouter-практики читають
-тільки цей кореневий `.env`.
+Файл `.env` не додається до Git і є єдиним спільним файлом налаштувань усіх
+практик. Не створюйте локальні `.env` в папках `starter/`, `solution/`, `my-dev/`
+або `dev/`.
 
 ## Основні команди
 
@@ -417,7 +416,7 @@ yarn verify:lesson01
 yarn test:lesson01:solution
 yarn check:lesson01:solution
 
-# Lesson 01 — безкоштовна альтернатива OpenRouter
+# Lesson 01 — DeepSeek V4 Flash через OpenRouter
 yarn dev:lesson01:openrouter "Що таке closure у JavaScript?"
 yarn dev:lesson01:openrouter:solution "Що таке closure у JavaScript?"
 yarn test:lesson01:openrouter

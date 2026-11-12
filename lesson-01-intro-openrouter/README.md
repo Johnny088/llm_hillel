@@ -3,7 +3,7 @@
 > **Студентам курсу:** Почніть із [INSTRUCTION.md](../INSTRUCTION.md) – головної точки входу. Далі виконуйте маршрут із [STUDENTS.md](../STUDENTS.md), де описано підготовку гілки, робочої папки та здачу. Для виконання уроку відкрийте [student-guide.md](./student-guide.md) та [homework.md](./homework.md).
 
 Практика запускає одноразовий застосунок командного рядка та надсилає текстовий
-запит до безкоштовної великої мовної моделі через OpenRouter.
+запит до DeepSeek V4 Flash через OpenRouter. Запити можуть мати вартість.
 
 **CLI (Command-Line Interface)** — програма, яка працює в терміналі.
 **LLM (Large Language Model)** — велика мовна модель, що формує текстову
@@ -26,22 +26,23 @@
 
 ```powershell
 yarn install --immutable
-if (-not (Test-Path lesson-01-intro-openrouter/solution/.env)) {
-  Copy-Item lesson-01-intro-openrouter/solution/.env.example lesson-01-intro-openrouter/solution/.env
-}
-notepad lesson-01-intro-openrouter/solution/.env
+yarn env:init
+notepad .env
 ```
 
-У локальному `.env` готового рішення задається ключ OpenRouter:
+В кореневому `./.env`, спільному для всіх практик, задається ключ OpenRouter:
 
 ```dotenv
 OPENROUTER_API_KEY=sk-or-v1-...
 ```
 
 Ключ створюється на сторінці <https://openrouter.ai/keys>. Реальний ключ не
-додається до Git і не вставляється в README. Локальний шаблон також фіксує
-моделі та reasoning effort саме для Lesson 01, тому очікуваний приклад запуску
-не залежить від налаштувань інших уроків у кореневому `.env`.
+додається до Git і не вставляється в README. `yarn env:init` створює кореневий
+`.env` лише за його відсутності та не перезаписує наявні налаштування. Значення
+з середовища процесу мають пріоритет над файлом. Для Lesson 01 модель за
+замовчуванням – `~deepseek/deepseek-v4-flash-latest`, reasoning effort – `low`,
+максимум відповіді – 1600 токенів, якщо кореневий `.env` і середовище процесу
+не задають власного значення.
 
 Якщо команда `yarn` не розпізнається, один раз виконується `corepack enable`,
 після чого повторюється `yarn install --immutable`.
@@ -65,13 +66,13 @@ yarn dev:lesson01:openrouter:solution "Обчисли 37 * 19. Поверни л
 ```text
 📤 Надіслано:
 Обчисли 37 * 19. Поверни лише число.
-🎯 Основна модель: nvidia/nemotron-3-super-120b-a12b:free
+🎯 Основна модель: ~deepseek/deepseek-v4-flash-latest
 ⏳ Очікування відповіді OpenRouter...
 
 📝 Відповідь:
 703
 
-🤖 Фактична модель: nvidia/...:free
+🤖 Фактична модель: <ID, повернутий OpenRouter>
 ```
 
 Критерій успіху: після напису `Відповідь` з'являється `703`, нижче вказується
@@ -116,18 +117,18 @@ yarn check:lesson01:openrouter:solution
 build. Структурний course audit є окремою командою. Provider inference не
 виконується, тому квота не витрачається.
 
-## Якщо вичерпано добову квоту безкоштовних моделей
+## Якщо OpenRouter повернув HTTP 429
 
 ```text
-❌ Не вдалося виконати запит: Вичерпано спільну добову квоту безкоштовних моделей OpenRouter.
+❌ Не вдалося виконати запит: OpenRouter відхилив запит через обмеження частоти або доступності.
 ```
 
-Застосунок дійшов до OpenRouter, але доступні безкоштовні запити облікового
-запису вже витрачено. Код, команда й `.env` не змінюються. Повторіть запит після
-відновлення квоти або перевірте умови доступу у провайдера.
+HTTP 429 може означати обмеження частоти, доступності або умов акаунта. Перевірте
+статус і ліміти OpenRouter та повторіть запит пізніше. Запити до DeepSeek можуть
+мати вартість.
 
 ## Детальні інструкції
 
 - [Готове рішення та додаткові перевірки](./solution/README.md)
 - [Навчальне завдання](./starter/README.md)
-- [Умови безкоштовної квоти OpenRouter](https://openrouter.ai/docs/faq)
+- [Довідка OpenRouter](https://openrouter.ai/docs/faq)

@@ -117,7 +117,7 @@ const contracts: StarterContract[] = [
 ];
 
 const expectedTodoCounts = new Map<string, number>([
-  ["lesson-01-intro-openrouter", 21],
+  ["lesson-01-intro-openrouter", 20],
   ["lesson-02-llm-api-openrouter", 12],
   ["lesson-07-agent-loop-openrouter", 0],
 ]);
@@ -421,9 +421,9 @@ async function verifyLesson06PhysicalInheritance(): Promise<void> {
   const failures: string[] = [];
   let exactMatches = 0;
 
-  if (trackedSourceFiles.length !== 65) {
+  if (trackedSourceFiles.length !== 66) {
     failures.push(
-      `expected the current 65-file Lesson 05 solution manifest, found ${trackedSourceFiles.length}.`,
+      `expected the current 66-file Lesson 05 solution manifest, found ${trackedSourceFiles.length}.`,
     );
   }
 
@@ -500,8 +500,8 @@ async function verifyLesson06PhysicalInheritance(): Promise<void> {
       `expected exactly ${trackedSourceFiles.length} starter paths, found ${starterRelative.size}.`,
     );
   }
-  if (exactMatches !== 64) {
-    failures.push(`expected exactly 64 byte-identical inherited files, found ${exactMatches}.`);
+  if (exactMatches !== 65) {
+    failures.push(`expected exactly 65 byte-identical inherited files, found ${exactMatches}.`);
   }
 
   if (failures.length > 0) {

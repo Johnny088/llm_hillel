@@ -1,12 +1,16 @@
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import dotenv from "dotenv";
 import OpenAI from "openai";
 import { z } from "zod";
 
 export const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 
-export const DEFAULT_OPENROUTER_MODEL = "nvidia/nemotron-3-super-120b-a12b:free";
-export const OPENROUTER_REASONING_EFFORTS = ["medium", "low"] as const;
-export const DEFAULT_REASONING_EFFORT = "medium";
-export const DEFAULT_MAX_TOKENS = 800;
+export const DEFAULT_OPENROUTER_MODEL = "~deepseek/deepseek-v4-flash-latest";
+export const OPENROUTER_REASONING_EFFORTS = ["max", "high", "low"] as const;
+export const DEFAULT_REASONING_EFFORT = "low";
+export const DEFAULT_MAX_TOKENS = 1_600;
 
 const environmentSchema = z.object({
   OPENROUTER_API_KEY: z.string().trim().min(1),
@@ -14,9 +18,46 @@ const environmentSchema = z.object({
   OPENROUTER_REASONING_EFFORT: z
     .enum(OPENROUTER_REASONING_EFFORTS)
     .default(DEFAULT_REASONING_EFFORT),
+  OPENROUTER_MAX_OUTPUT_TOKENS: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(32_000)
+    .default(DEFAULT_MAX_TOKENS),
 });
 
 export type Environment = z.infer<typeof environmentSchema>;
+
+export function loadRootEnvironment(
+  moduleUrl: string,
+  environment: Readonly<Record<string, string | undefined>> = process.env,
+): Record<string, string> {
+  let directory = dirname(fileURLToPath(moduleUrl));
+
+  for (;;) {
+    if (existsSync(resolve(directory, "package.json"))) {
+      const envPath = resolve(directory, ".env");
+      const fileEnvironment = existsSync(envPath)
+        ? dotenv.parse(readFileSync(envPath, "utf8"))
+        : {};
+      const processEnvironment = Object.fromEntries(
+        Object.entries(environment).filter(
+          (entry): entry is [string, string] => entry[1] !== undefined,
+        ),
+      );
+
+      return { ...fileEnvironment, ...processEnvironment };
+    }
+
+    const parentDirectory = dirname(directory);
+
+    if (parentDirectory === directory) {
+      throw new UserFacingError("Не вдалося знайти корінь репозиторію.");
+    }
+
+    directory = parentDirectory;
+  }
+}
 
 export class UserFacingError extends Error {
   public constructor(message: string) {
@@ -55,30 +96,7 @@ export type SafeApiFailure = {
   name: string;
   status?: number;
   request_id?: string | null;
-  freeModelDailyLimit?: boolean;
 };
-
-type OpenRouterErrorExtension = {
-  message?: unknown;
-  metadata?: {
-    previous_errors?: Array<{ message?: unknown }>;
-  };
-};
-
-function isFreeModelDailyLimit(payload: unknown): boolean {
-  const extension = payload as OpenRouterErrorExtension | undefined;
-  const previousErrors = extension?.metadata?.previous_errors;
-  const messages = [
-    extension?.message,
-    ...(Array.isArray(previousErrors) ? previousErrors : []).map((entry) =>
-      entry && typeof entry === "object" ? entry.message : undefined,
-    ),
-  ];
-
-  return messages.some(
-    (message) => typeof message === "string" && message.includes("free-models-per-day"),
-  );
-}
 
 export function formatApiFailure(error: SafeApiFailure): string {
   if (error.name === "APIConnectionTimeoutError") {
@@ -87,10 +105,6 @@ export function formatApiFailure(error: SafeApiFailure): string {
 
   if (error.name === "APIConnectionError") {
     return "Не вдалося з'єднатися з API.";
-  }
-
-  if (error.status === 429 && error.freeModelDailyLimit) {
-    return "Вичерпано спільну добову квоту безкоштовних моделей OpenRouter.";
   }
 
   const status = typeof error.status === "number" ? `HTTP ${error.status}` : error.name;
@@ -105,7 +119,6 @@ export function formatError(error: unknown): string {
       name: error.constructor.name,
       ...(typeof error.status === "number" ? { status: error.status } : {}),
       ...(error.requestID ? { request_id: error.requestID } : {}),
-      freeModelDailyLimit: isFreeModelDailyLimit(error.error),
     });
   }
 
@@ -124,7 +137,7 @@ export type ChatRequest = {
   model: string;
   messages: ChatMessage[];
   reasoning: { enabled: boolean; effort: ReasoningEffort };
-  max_tokens: number;
+  max_completion_tokens: number;
 };
 
 export interface ChatClient {
@@ -152,7 +165,7 @@ export async function requestAnswer(
       { role: "user", content: input },
     ],
     reasoning: { enabled: true, effort: environment.OPENROUTER_REASONING_EFFORT },
-    max_tokens: DEFAULT_MAX_TOKENS,
+    max_completion_tokens: environment.OPENROUTER_MAX_OUTPUT_TOKENS,
   });
 
   const answer = response.text.trim();

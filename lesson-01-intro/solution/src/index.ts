@@ -1,17 +1,15 @@
-import dotenv from "dotenv";
 import OpenAI from "openai";
 import {
   formatError,
   loadEnvironment,
+  loadRootEnvironment,
   readUserInput,
   requestAnswer,
   type ResponsesClient,
 } from "./cli.js";
 
-dotenv.config({ quiet: true });
-
 async function main(): Promise<void> {
-  const environment = loadEnvironment(process.env);
+  const environment = loadEnvironment(loadRootEnvironment(import.meta.url));
   const input = readUserInput(process.argv.slice(2));
 
   console.log("\n📤 Надіслано:");

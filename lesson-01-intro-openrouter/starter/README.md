@@ -25,12 +25,12 @@ yarn dev:lesson01:openrouter:solution "Обчисли 37 * 19. Поверни л
 
 Після завершення starter має:
 
-- прочитати `OPENROUTER_API_KEY` та необов'язкові налаштування з `.env`;
+- прочитати `OPENROUTER_API_KEY` і необов'язкові налаштування зі спільного кореневого `./.env`;
 - отримати непорожній запит з аргументів командного рядка;
 - надіслати system message і user message до OpenRouter;
 - надіслати запит до однієї налаштованої моделі;
 - повернути текст та ID фактичної моделі;
-- безпечно пояснити network error, timeout, HTTP status і спільний добовий ліміт;
+- безпечно пояснити network error, timeout і HTTP status, зокрема загальну причину HTTP 429;
 - не вивести ключ, provider body або службові reasoning-поля.
 
 ## Робочі файли
@@ -49,8 +49,8 @@ tests/cli.test.ts
 2. Реалізувати `readUserInput(args)` з об'єднанням аргументів і `trim()`.
 3. Реалізувати `formatApiFailure(error)` без витоку provider body.
 4. Реалізувати `requestAnswer(client, environment, input)` із повідомленнями,
-   reasoning і `max_tokens` для однієї налаштованої моделі.
-5. Замінити всі 21 `it.todo` повноцінними unit-тестами.
+   reasoning і `max_completion_tokens` для однієї налаштованої моделі.
+5. Замінити всі 20 `it.todo` повноцінними unit-тестами.
 6. Запустити фінальну автоматичну перевірку.
 7. Виконати один контрольований реальний запит без приватних даних.
 
@@ -87,13 +87,11 @@ yarn check:lesson01:openrouter
 
 ## Запуск реалізованого starter
 
-Перед першим реальним запуском створюється локальний `.env` саме для starter:
+Перед першим реальним запуском із кореня репозиторію створюється спільний `.env`, лише якщо його ще немає:
 
 ```powershell
-if (-not (Test-Path lesson-01-intro-openrouter/starter/.env)) {
-  Copy-Item lesson-01-intro-openrouter/starter/.env.example lesson-01-intro-openrouter/starter/.env
-}
-notepad lesson-01-intro-openrouter/starter/.env
+yarn env:init
+notepad .env
 ```
 
 Після завершення `TODO` із кореня репозиторію виконується команда без
@@ -109,8 +107,7 @@ yarn dev:lesson01:openrouter "Що таке closure у JavaScript?"
 ## Важливі обмеження
 
 - Unit-тести не звертаються до реального OpenRouter API.
-- Реальний ключ зберігається в `.env`, який ігнорується Git: локальному
-  `starter/.env` або кореневому.
+- Реальний ключ зберігається лише в спільному кореневому `./.env`, який ігнорується Git. Змінні середовища процесу мають пріоритет.
 - Застосунок використовує одну налаштовану модель за запит і повідомляє про контрольовану помилку, якщо запит не вдався.
 - У навчальні запити не додаються персональні або конфіденційні дані.
 - Деталі готової реалізації наведено в [solution README](../solution/README.md).

@@ -128,6 +128,8 @@ export async function assertRepositoryEnvironmentReady(
   lesson: number,
   rootDirectory: string = repositoryRoot,
 ): Promise<void> {
+  await ensureRepositoryEnvironmentFile(rootDirectory);
+
   if (lesson < 2) {
     return;
   }
@@ -135,17 +137,42 @@ export async function assertRepositoryEnvironmentReady(
   const rootEnvPath = join(rootDirectory, ".env");
 
   if (!existsSync(rootEnvPath)) {
-    throw new Error(
-      "Починаючи з Lesson 02 потрібен кореневий .env. Створіть його з .env.example до міграції dev/.",
-    );
+    throw new Error("Потрібен кореневий .env. Його не вдалося створити з кореневого .env.example.");
   }
 
   const rootEnvironment = await readFile(rootEnvPath, "utf8");
 
   if (!readDotenvValue(rootEnvironment, "OPENROUTER_API_KEY")) {
     throw new Error(
-      "У кореневому .env потрібно задати OPENROUTER_API_KEY до видалення локального dev/.env.",
+      "В кореневому .env потрібно задати OPENROUTER_API_KEY перед переходом до Lesson 02 або пізнішого.",
     );
+  }
+}
+
+export async function ensureRepositoryEnvironmentFile(
+  rootDirectory: string = repositoryRoot,
+): Promise<boolean> {
+  const rootEnvPath = join(rootDirectory, ".env");
+
+  if (existsSync(rootEnvPath)) {
+    return false;
+  }
+
+  const examplePath = join(rootDirectory, ".env.example");
+
+  if (!existsSync(examplePath)) {
+    throw new Error("Кореневий .env.example не знайдено.");
+  }
+
+  try {
+    await writeFile(rootEnvPath, await readFile(examplePath), { flag: "wx" });
+    return true;
+  } catch (error) {
+    if (typeof error === "object" && error !== null && "code" in error && error.code === "EEXIST") {
+      return false;
+    }
+
+    throw error;
   }
 }
 
@@ -191,6 +218,10 @@ export interface DiffReport {
   modified: string[];
   deleted: string[];
   identical: string[];
+}
+
+export function preserveLesson01LocalEnvironment(diff: DiffReport): DiffReport {
+  return { ...diff, deleted: diff.deleted.filter((file) => file !== ".env") };
 }
 
 export async function compareDirectories(
@@ -400,12 +431,13 @@ export async function runStatus(): Promise<void> {
   console.log(` • Провайдер:        ${state.provider} (лише OpenRouter)`);
   console.log(` • Поточна стадія:   ${state.stage}`);
   console.log(` • Чекпоінт:         ${state.checkpoint}`);
+  const hasRootEnvironment = existsSync(join(repositoryRoot, ".env"));
   console.log(
-    ` • Джерело env:      ${state.lesson >= 2 ? "кореневий .env" : "локальний dev/.env"}`,
+    ` • Джерело env:      кореневий .env ${hasRootEnvironment ? "(є)" : "(відсутній; init створить із .env.example)"}`,
   );
 
-  if (state.lesson >= 2 && DEV_LOCAL_ENV_FILES.some((name) => existsSync(join(devRoot, name)))) {
-    console.log(" ⚠ Локальний dev/.env або dev/.env.example більше не повинен існувати.");
+  if (existsSync(join(devRoot, ".env"))) {
+    console.log(" ⚠ dev/.env ігнорується; використовується кореневий .env.");
   }
 
   const lessonRoot = join(repositoryRoot, state.lessonDir);
@@ -685,7 +717,8 @@ export async function runInit(targetInput: string | number = 1): Promise<void> {
 
   await mkdir(devRoot, { recursive: true });
   const diff = await compareDirectories(devRoot, starterRoot);
-  await applySafeSync(starterRoot, diff, devRoot, false);
+  const initDiff = lessonNum === 1 ? preserveLesson01LocalEnvironment(diff) : diff;
+  await applySafeSync(starterRoot, initDiff, devRoot, false);
   const removedEnvironmentFiles =
     lessonNum >= 2 ? await removeDevLocalEnvironmentFiles(devRoot) : [];
 

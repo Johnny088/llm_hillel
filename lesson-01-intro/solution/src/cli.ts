@@ -1,3 +1,7 @@
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import dotenv from "dotenv";
 import OpenAI from "openai";
 import { z } from "zod";
 
@@ -7,6 +11,37 @@ const environmentSchema = z.object({
 });
 
 export type Environment = z.infer<typeof environmentSchema>;
+
+export function loadRootEnvironment(
+  moduleUrl: string,
+  environment: Readonly<Record<string, string | undefined>> = process.env,
+): Record<string, string> {
+  let directory = dirname(fileURLToPath(moduleUrl));
+
+  for (;;) {
+    if (existsSync(resolve(directory, "package.json"))) {
+      const envPath = resolve(directory, ".env");
+      const fileEnvironment = existsSync(envPath)
+        ? dotenv.parse(readFileSync(envPath, "utf8"))
+        : {};
+      const processEnvironment = Object.fromEntries(
+        Object.entries(environment).filter(
+          (entry): entry is [string, string] => entry[1] !== undefined,
+        ),
+      );
+
+      return { ...fileEnvironment, ...processEnvironment };
+    }
+
+    const parentDirectory = dirname(directory);
+
+    if (parentDirectory === directory) {
+      throw new UserFacingError("Не вдалося знайти корінь репозиторію.");
+    }
+
+    directory = parentDirectory;
+  }
+}
 
 export class UserFacingError extends Error {
   public constructor(message: string) {

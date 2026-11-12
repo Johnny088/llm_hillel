@@ -3,53 +3,32 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
+  DEFAULT_MAX_TOKENS,
   DEFAULT_OPENROUTER_MODEL,
   DEFAULT_REASONING_EFFORT,
   OPENROUTER_REASONING_EFFORTS,
 } from "../src/cli.js";
 
 const solutionRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const environmentExamplePath = resolve(solutionRoot, ".env.example");
+const rootEnvironmentExample = resolve(solutionRoot, "../.env.example");
 
-describe("Безкоштовна модель з нульовою вартістю", () => {
-  it("дефолтна модель помічена як безкоштовний тариф OpenRouter (:free)", () => {
-    expect(DEFAULT_OPENROUTER_MODEL).toMatch(/:free$/u);
+describe("спільні налаштування OpenRouter", () => {
+  it("використовує модель і параметри з кореневого .env.example", async () => {
+    const example = await readFile(rootEnvironmentExample, "utf8");
+    const value = (key: string) =>
+      example
+        .split(/\r?\n/u)
+        .find((line) => line.startsWith(`${key}=`))
+        ?.split("=", 2)[1]
+        ?.trim();
+
+    expect(value("OPENROUTER_MODEL")).toBe(DEFAULT_OPENROUTER_MODEL);
+    expect(value("OPENROUTER_REASONING_EFFORT")).toBe(DEFAULT_REASONING_EFFORT);
+    expect(Number(value("OPENROUTER_MAX_OUTPUT_TOKENS"))).toBe(DEFAULT_MAX_TOKENS);
+    expect(value("OPENROUTER_API_KEY")).toBe("");
   });
 
-  it("дефолтний рівень мислення належить до дозволених значень", () => {
-    expect(OPENROUTER_REASONING_EFFORTS).toContain(DEFAULT_REASONING_EFFORT);
-  });
-
-  it("дефолтна модель у .env.example збігається з дефолтом у коді", async () => {
-    const example = await readFile(environmentExamplePath, "utf8");
-    const configuredModel = example
-      .split(/\r?\n/u)
-      .find((line) => line.startsWith("OPENROUTER_MODEL="))
-      ?.split("=", 2)[1]
-      ?.trim();
-
-    expect(configuredModel).toBe(DEFAULT_OPENROUTER_MODEL);
-  });
-
-  it("дефолтний reasoning effort у .env.example збігається з дефолтом у коді", async () => {
-    const example = await readFile(environmentExamplePath, "utf8");
-    const configuredEffort = example
-      .split(/\r?\n/u)
-      .find((line) => line.startsWith("OPENROUTER_REASONING_EFFORT="))
-      ?.split("=", 2)[1]
-      ?.trim();
-
-    expect(configuredEffort).toBe(DEFAULT_REASONING_EFFORT);
-  });
-
-  it(".env.example тримає OPENROUTER_API_KEY порожнім (без реального ключа)", async () => {
-    const example = await readFile(environmentExamplePath, "utf8");
-    const apiKeyValue = example
-      .split(/\r?\n/u)
-      .find((line) => line.startsWith("OPENROUTER_API_KEY="))
-      ?.split("=", 2)[1]
-      ?.trim();
-
-    expect(apiKeyValue).toBe("");
+  it("приймає всі reasoning values із shared env", () => {
+    expect(OPENROUTER_REASONING_EFFORTS).toEqual(["max", "high", "low"]);
   });
 });

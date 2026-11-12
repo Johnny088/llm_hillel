@@ -93,7 +93,7 @@ async function seedPhysicalInheritanceFixture(fixtureRoot: string): Promise<stri
   )
     .split(/\r?\n/u)
     .filter((file) => file.startsWith(lesson05SolutionPrefix));
-  expect(trackedFiles).toHaveLength(65);
+  expect(trackedFiles).toHaveLength(66);
 
   const sourceRoot = join(fixtureRoot, "lesson-05-memory-openrouter", "solution");
   const starterRoot = join(fixtureRoot, "lesson-06-rag-openrouter", "starter");
@@ -161,7 +161,7 @@ async function seedExpectedStarterMigrationFixture(fixtureRoot: string): Promise
   )
     .split(/\r?\n/u)
     .filter((file) => file.startsWith(lesson05SolutionPrefix));
-  expect(trackedFiles).toHaveLength(65);
+  expect(trackedFiles).toHaveLength(66);
   const devRoot = join(fixtureRoot, "dev");
   const starterRoot = join(fixtureRoot, "lesson-06-rag-openrouter", "starter");
   for (const trackedFile of trackedFiles) {
@@ -200,13 +200,13 @@ afterEach(async () => {
 });
 
 describe("Lesson 06 OpenRouter physical inheritance gate", () => {
-  it("accepts only the 65-path Lesson 05 solution mirror with a root README exception", async () => {
+  it("accepts only the 66-path Lesson 05 solution mirror with a root README exception", async () => {
     const fixtureRoot = await createFixture("inheritance");
     const starterRoot = await seedPhysicalInheritanceFixture(fixtureRoot);
 
     const clean = runPhysicalVerifier(fixtureRoot);
     expect(clean.status, clean.stderr).toBe(0);
-    expect(clean.stdout).toContain("64 byte-identical Git-tracked Lesson 05 files");
+    expect(clean.stdout).toContain("65 byte-identical Git-tracked Lesson 05 files");
     expect(clean.stdout).toContain("one root README.md exception");
 
     const inheritedPath = join(starterRoot, "src", "app.ts");
@@ -447,7 +447,7 @@ describe("Lesson 06 OpenRouter migration and local data boundaries", () => {
     await applySafeSync(fixtureStarter, before, fixtureDev);
     const after = await compareDirectories(fixtureDev, fixtureStarter);
     expect(after).toMatchObject({ added: [], modified: [], deleted: [] });
-    expect(after.identical).toHaveLength(65);
+    expect(after.identical).toHaveLength(66);
   });
 
   it("ignores only Lesson 06 learner memory JSON and keeps the prepared index tracked", () => {

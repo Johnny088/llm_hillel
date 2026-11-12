@@ -16,6 +16,7 @@ const validEnvironment = {
   OPENROUTER_API_KEY: "test-only-value",
   OPENROUTER_MODEL: "configured-for-test",
   OPENROUTER_REASONING_EFFORT: "low",
+  OPENROUTER_MAX_OUTPUT_TOKENS: 1_600,
 } as const;
 
 describe("loadEnvironment", () => {
@@ -28,22 +29,36 @@ describe("loadEnvironment", () => {
       OPENROUTER_API_KEY: "test-only-value",
       OPENROUTER_MODEL: DEFAULT_OPENROUTER_MODEL,
       OPENROUTER_REASONING_EFFORT: DEFAULT_REASONING_EFFORT,
+      OPENROUTER_MAX_OUTPUT_TOKENS: DEFAULT_MAX_TOKENS,
     });
   });
 
-  it("відхиляє рівень мислення, який модель не підтримує", () => {
+  it("відхиляє рівень мислення поза спільною конфігурацією", () => {
     expect(() =>
       loadEnvironment({
         OPENROUTER_API_KEY: "test-only-value",
-        OPENROUTER_REASONING_EFFORT: "high",
+        OPENROUTER_REASONING_EFFORT: "medium",
       }),
     ).toThrow("OPENROUTER_REASONING_EFFORT");
+  });
+
+  it("приймає спільні reasoning levels і output token budget", () => {
+    for (const effort of ["low", "high", "max"] as const) {
+      expect(
+        loadEnvironment({
+          OPENROUTER_API_KEY: "test-only-value",
+          OPENROUTER_REASONING_EFFORT: effort,
+          OPENROUTER_MAX_OUTPUT_TOKENS: "2400",
+        }),
+      ).toMatchObject({ OPENROUTER_REASONING_EFFORT: effort, OPENROUTER_MAX_OUTPUT_TOKENS: 2400 });
+    }
   });
 
   it("повертає лише перевірені поля", () => {
     expect(
       loadEnvironment({
         ...validEnvironment,
+        OPENROUTER_MAX_OUTPUT_TOKENS: "1600",
         EXTRA_VALUE: "not-returned",
       }),
     ).toEqual(validEnvironment);
@@ -85,14 +100,14 @@ describe("formatApiFailure", () => {
     expect(formatApiFailure({ name: "RateLimitError" })).toBe("RateLimitError");
   });
 
-  it("пояснює спільний добовий ліміт безкоштовних моделей", () => {
+  it("форматує generic HTTP 429 без provider payload", () => {
     expect(
       formatApiFailure({
         name: "RateLimitError",
         status: 429,
-        freeModelDailyLimit: true,
+        request_id: "req_rate_limit",
       }),
-    ).toBe("Вичерпано спільну добову квоту безкоштовних моделей OpenRouter.");
+    ).toBe("HTTP 429; request_id=req_rate_limit");
   });
 });
 
@@ -118,7 +133,7 @@ describe("formatError", () => {
     );
   });
 
-  it("розпізнає маркер добового free-ліміту в реальній APIError", () => {
+  it("форматує реальну RateLimitError без витоку provider payload", () => {
     const error = OpenAI.APIError.generate(
       429,
       {
@@ -129,7 +144,7 @@ describe("formatError", () => {
             previous_errors: [
               {
                 code: 429,
-                message: "Rate limit exceeded: free-models-per-day. private provider text",
+                message: "Rate limit exceeded: private provider text",
               },
             ],
           },
@@ -139,9 +154,7 @@ describe("formatError", () => {
       new Headers(),
     );
 
-    expect(formatError(error)).toBe(
-      "Вичерпано спільну добову квоту безкоштовних моделей OpenRouter.",
-    );
+    expect(formatError(error)).toBe("HTTP 429");
   });
 
   it("пропускає повідомлення UserFacingError без витоку секретів", () => {
@@ -194,11 +207,11 @@ describe("requestAnswer", () => {
         { role: "user", content: "Короткий запит" },
       ],
       reasoning: { enabled: true, effort: validEnvironment.OPENROUTER_REASONING_EFFORT },
-      max_tokens: DEFAULT_MAX_TOKENS,
+      max_completion_tokens: DEFAULT_MAX_TOKENS,
     });
   });
 
-  it("підставляє дефолтні model, effort і max_tokens у запит", async () => {
+  it("підставляє дефолтні model, effort і max_completion_tokens у запит", async () => {
     const create = vi.fn().mockResolvedValue({ text: "Готово" });
 
     const environment = loadEnvironment({
@@ -207,24 +220,41 @@ describe("requestAnswer", () => {
 
     await requestAnswer({ create }, environment, "Короткий запит");
 
+    const request = create.mock.calls[0]?.[0];
+    expect(request).toHaveProperty("max_completion_tokens", DEFAULT_MAX_TOKENS);
+    expect(request).not.toHaveProperty("max_tokens");
+
     expect(create).toHaveBeenCalledWith(
       expect.objectContaining({
         model: DEFAULT_OPENROUTER_MODEL,
         reasoning: { enabled: true, effort: DEFAULT_REASONING_EFFORT },
-        max_tokens: DEFAULT_MAX_TOKENS,
+        max_completion_tokens: DEFAULT_MAX_TOKENS,
       }),
     );
+  });
+
+  it("передає налаштований OPENROUTER_MAX_OUTPUT_TOKENS в запит", async () => {
+    const create = vi.fn().mockResolvedValue({ text: "Готово" });
+    const environment = loadEnvironment({
+      OPENROUTER_API_KEY: "test-only-value",
+      OPENROUTER_MAX_OUTPUT_TOKENS: "2400",
+    });
+
+    await requestAnswer({ create }, environment, "Короткий запит");
+
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({ max_completion_tokens: 2_400 }));
+    expect(create.mock.calls[0]?.[0]).not.toHaveProperty("max_tokens");
   });
 
   it("повертає фактичну модель, на яку відповів OpenRouter", async () => {
     const create = vi.fn().mockResolvedValue({
       text: "Готово",
-      model: "upstage/solar-pro-3:free",
+      model: "deepseek/deepseek-v4-flash",
     });
 
     await expect(requestAnswer({ create }, validEnvironment, "Короткий запит")).resolves.toEqual({
       text: "Готово",
-      model: "upstage/solar-pro-3:free",
+      model: "deepseek/deepseek-v4-flash",
     });
   });
 

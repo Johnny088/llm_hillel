@@ -41,7 +41,7 @@ afterEach(async () => {
 describe("Lesson 08 OpenRouter physical inheritance gate", () => {
   it("accepts the Git-tracked predecessor manifest with its root README exception", async () => {
     const clean = await inspectLesson08OpenRouterScaffolding(starterRoot);
-    expect(clean[0]).toContain("PASS Lesson 08 OpenRouter physical starter: 88 byte-identical");
+    expect(clean[0]).toContain("PASS Lesson 08 OpenRouter physical starter: 89 byte-identical");
 
     const candidate = await copyStarter("readme-exception");
     await writeFile(join(candidate, "README.md"), "Docs-owned root README exception.\n", "utf8");

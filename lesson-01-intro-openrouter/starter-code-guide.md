@@ -18,11 +18,10 @@
 
 ```text
 starter/
-├── .env.example         безпечний шаблон локальних налаштувань Lesson 01
 ├── README.md            інструкція до практики
 ├── src/index.ts         точка входу: збирає частини в один сценарій
 ├── src/cli.ts           навчальна логіка: тут усі TODO студента
-└── tests/cli.test.ts    21 вимога до поведінки у вигляді it.todo()
+└── tests/cli.test.ts    20 вимог до поведінки в вигляді it.todo()
 ```
 
 Розподіл відповідальності — головна ментальна модель заняття:
@@ -53,11 +52,11 @@ environment + input → requestAnswer()       збірка запиту й ви�
 
 1. `loadEnvironment()` — Zod `safeParse`; у помилці лише назви полів, ніколи їхні значення;
 2. `readUserInput()` — об'єднати аргументи, `trim()`, відхилити порожній запит;
-3. `formatApiFailure()` — timeout / network / спільна добова квота free-моделей (429) / HTTP status без витоку provider body;
-4. `requestAnswer()` — збірка `ChatRequest` (system + user, reasoning, max_tokens), один виклик `client.create`, trim відповіді та фактична модель;
-5. Замінити всі 21 `it.todo` повноцінними unit-тестами.
+3. `formatApiFailure()` — timeout / network / загальний HTTP 429 / HTTP status без витоку provider body;
+4. `requestAnswer()` — збірка `ChatRequest` (system + user, reasoning, max_completion_tokens), один виклик `client.create`, trim відповіді та фактична модель;
+5. Замінити всі 20 `it.todo` повноцінними unit-тестами.
 
-**Чому тести працюватимуть без API:** `requestAnswer` залежить від маленького інтерфейсу `ChatClient`, тому в тестах підставляється mock — контрольована тестова заміна клієнта без інтернету, ключа й витрат квоти.
+**Чому тести працюватимуть без API:** `requestAnswer` залежить від маленького інтерфейсу `ChatClient`, тому в тестах підставляється mock — контрольована тестова заміна клієнта без інтернету й реального запиту.
 
 ## 5. Де starter зупиняється
 
@@ -73,13 +72,13 @@ environment + input → requestAnswer()       збірка запиту й ви�
 
 Запустіть **Промпт 1** зі [STUDENTS.md](../STUDENTS.md), оберіть Lesson `01` та OpenRouter і працюйте у створеній папці `my-dev/lesson-01-intro-openrouter/`. Редагуйте там копію файлів зі starter. Не змінюйте canonical `starter/` і `solution/` або викладацьку папку `dev/`.
 
-Стартовий код містить 21 `it.todo`. Це навмисні заглушки, які ви поступово заміните тестами. Переглянути початковий результат можна так:
+Стартовий код містить 20 `it.todo`. Це навмисні заглушки, які поступово замінюються тестами. Переглянути початковий результат можна так:
 
 ```powershell
 yarn vitest run my-dev/lesson-01-intro-openrouter/tests
 ```
 
-Для незміненого starter очікуються `0 passed, 21 todo`. Команда `yarn test:my:lesson01:openrouter` також є строгим TODO gate, тому до реалізації всіх тестів вона завершується помилкою.
+Для незміненого starter очікуються `0 passed, 20 todo`. Команда `yarn test:my:lesson01:openrouter` також є строгим TODO gate, тому до реалізації всіх тестів вона завершується помилкою.
 
 ## 7. Команди
 
@@ -93,14 +92,11 @@ yarn vitest run my-dev/lesson-01-intro-openrouter/tests
 | Повний offline gate після завершення           | `yarn check:my:lesson01:openrouter`                       |
 | Ручний запуск після offline checks             | `yarn dev:my:lesson01:openrouter "запит"`                 |
 
-Локальні unit-тести використовують mock і не потребують API. Ручний запуск потребує ключа й мережі. Застосунок читає `.env` поруч із `my-dev/lesson-01-intro-openrouter/src/index.ts`, а потім кореневий `.env` як резервне джерело. Якщо потрібні окремі налаштування Lesson 01, створіть `my-dev/lesson-01-intro-openrouter/.env` із `.env.example` і заповніть локально лише `OPENROUTER_API_KEY`. Не друкуйте та не додавайте ключ до Git.
+Локальні unit-тести використовують mock і не потребують API. Ручний запуск потребує ключа й мережі. Усі практики читають спільний кореневий `./.env`; зовнішні змінні середовища мають пріоритет. Якщо файла ще немає, створіть його з кореня репозиторію командою `yarn env:init`, яка не перезаписує наявний файл. Введіть `OPENROUTER_API_KEY` лише в цей кореневий файл. Не друкуйте та не додавайте ключ до Git.
 
 ```powershell
-$studentEnvPath = "my-dev/lesson-01-intro-openrouter/.env"
-if (-not (Test-Path -LiteralPath $studentEnvPath)) {
-  Copy-Item "my-dev/lesson-01-intro-openrouter/.env.example" $studentEnvPath
-}
-notepad $studentEnvPath
+yarn env:init
+notepad .env
 ```
 
 ## 8. Головне після знайомства
@@ -120,13 +116,6 @@ notepad $studentEnvPath
 <details> <summary><b>src/index.ts — повний код з построковими коментарями</b></summary>
 
 ```ts
-// Ці модулі формують абсолютний шлях до локального .env заняття.
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-
-// dotenv читає .env-файли й додає значення до process.env.
-import dotenv from "dotenv";
-
 // Імпортуємо офіційний OpenAI SDK.
 // У цій практиці він використовується не для OpenAI напряму,
 // а як HTTP-клієнт для OpenRouter, тому що OpenRouter має
@@ -140,6 +129,9 @@ import {
 
   // Читає й валідує process.env.
   loadEnvironment,
+
+  // Завантажує лише спільний кореневий .env; process.env має пріоритет.
+  loadRootEnvironment,
 
   // Перетворює CLI-аргументи на один user prompt.
   readUserInput,
@@ -155,18 +147,15 @@ import {
   type ChatClient,
 } from "./cli.js";
 
-// Локальний .env поруч із копією програми читається першим і визначає конфігурацію Lesson 01.
-const localEnvPath = resolve(dirname(fileURLToPath(import.meta.url)), "../.env");
-
-// Кореневий .env лише доповнює відсутні значення й не перезаписує локальні.
-dotenv.config({ quiet: true, path: localEnvPath });
-dotenv.config({ quiet: true });
+// Під час запуску завантажується лише спільний кореневий .env.
+// loadRootEnvironment() визначає корінь за package.json,
+// ігнорує practice-local .env і об'єднує дані з пріоритетом process.env.
 
 // Головна async-функція застосунку.
 // Promise<void>: асинхронна, але корисного значення не повертає.
 async function main(): Promise<void> {
   // Усі environment variables передаємо у loadEnvironment().
-  const environment = loadEnvironment(process.env);
+  const environment = loadEnvironment(loadRootEnvironment(import.meta.url));
 
   // process.argv: [0] — шлях до Node.js, [1] — шлях до скрипта,
   // slice(2) залишає лише аргументи користувача.
@@ -242,12 +231,12 @@ import OpenAI from "openai";
 import { z } from "zod";
 
 export const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
-export const DEFAULT_OPENROUTER_MODEL = "nvidia/nemotron-3-super-120b-a12b:free";
+export const DEFAULT_OPENROUTER_MODEL = "~deepseek/deepseek-v4-flash-latest";
 
-// as const → readonly tuple з літералами "medium" | "low".
-export const OPENROUTER_REASONING_EFFORTS = ["medium", "low"] as const;
-export const DEFAULT_REASONING_EFFORT = "medium";
-export const DEFAULT_MAX_TOKENS = 800;
+// as const → readonly tuple з дозволеними значеннями.
+export const OPENROUTER_REASONING_EFFORTS = ["max", "high", "low"] as const;
+export const DEFAULT_REASONING_EFFORT = "low";
+export const DEFAULT_MAX_TOKENS = 1_600;
 
 export const environmentSchema = z.object({
   // Обов'язковий: рядок, trim, непорожній.
@@ -256,10 +245,16 @@ export const environmentSchema = z.object({
   // Необов'язковий з дефолтом.
   OPENROUTER_MODEL: z.string().trim().min(1).default(DEFAULT_OPENROUTER_MODEL),
 
-  // Лише значення з дозволеного списку; дефолт medium.
+  // Лише значення з дозволеного списку; дефолт low.
   OPENROUTER_REASONING_EFFORT: z
     .enum(OPENROUTER_REASONING_EFFORTS)
     .default(DEFAULT_REASONING_EFFORT),
+  OPENROUTER_MAX_OUTPUT_TOKENS: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(32_000)
+    .default(DEFAULT_MAX_TOKENS),
 });
 
 // TypeScript-тип автоматично виводиться зі схеми.
@@ -295,39 +290,12 @@ export type SafeApiFailure = {
   name: string;
   status?: number;
   request_id?: string | null;
-  freeModelDailyLimit?: boolean;
 };
-
-// Мінімальний тип тієї частини OpenRouter error payload,
-// яка потрібна лише для розпізнавання free-models-per-day.
-type OpenRouterErrorExtension = {
-  message?: unknown;
-  metadata?: {
-    previous_errors?: Array<{ message?: unknown }>;
-  };
-};
-
-// Чи містить payload маркер спільного добового free-ліміту?
-function isFreeModelDailyLimit(payload: unknown): boolean {
-  const extension = payload as OpenRouterErrorExtension | undefined;
-  const previousErrors = extension?.metadata?.previous_errors;
-
-  const messages = [
-    extension?.message,
-    ...(Array.isArray(previousErrors) ? previousErrors : []).map((entry) =>
-      entry && typeof entry === "object" ? entry.message : undefined,
-    ),
-  ];
-
-  return messages.some(
-    (message) => typeof message === "string" && message.includes("free-models-per-day"),
-  );
-}
 
 // === НАВЧАЛЬНЕ ЗАВДАННЯ 3 ===============================================
 export function formatApiFailure(_error: SafeApiFailure): string {
   // Треба окремо обробити: timeout, network error,
-  // HTTP 429 + freeModelDailyLimit, звичайний статус, статус відсутній.
+  // загальне HTTP 429, звичайний статус, статус відсутній.
   throw new UserFacingError("TODO: потрібно реалізувати formatApiFailure(error).");
 }
 
@@ -339,7 +307,6 @@ export function formatError(error: unknown): string {
       name: error.constructor.name,
       ...(typeof error.status === "number" ? { status: error.status } : {}),
       ...(error.requestID ? { request_id: error.requestID } : {}),
-      freeModelDailyLimit: isFreeModelDailyLimit(error.error),
     });
   }
 
@@ -360,7 +327,7 @@ export type ChatRequest = {
   maxRetries: 0;
   messages: ChatMessage[];
   reasoning: { enabled: boolean; effort: ReasoningEffort };
-  max_tokens: number;
+  max_completion_tokens: number;
 };
 
 // Абстракція між бізнес-логікою та конкретним SDK.
@@ -379,7 +346,7 @@ export async function requestAnswer(
   _environment: Environment,
   _input: string,
 ): Promise<AnswerResult> {
-  // TODO: один виклик client.create з model, messages, reasoning і max_tokens.
+  // TODO: один виклик client.create з model, messages, reasoning і max_completion_tokens.
   // trim response.text, відхилити порожнє значення й повернути фактичну model.
 
   throw new UserFacingError("TODO: потрібно реалізувати requestAnswer(...).");
@@ -423,14 +390,14 @@ describe("CLI helpers — завдання студента (OpenRouter)", () =>
   // Немає status → лише безпечна назва класу помилки.
   it.todo("форматує невідомий статус лише за ім'ям помилки");
 
-  // 429 + маркер → пояснення спільного добового free-ліміту.
-  it.todo("пояснює спільний добовий ліміт безкоштовних моделей");
+  // HTTP 429 → безпечний статус і request_id без provider payload.
+  it.todo("форматує generic HTTP 429 без provider payload");
 
   // formatError() розпізнає реальні екземпляри помилок OpenAI SDK:
   it.todo("розпізнає реальний AuthenticationError через formatError");
   it.todo("розпізнає реальний APIConnectionError через formatError");
   it.todo("розпізнає реальний APIConnectionTimeoutError через formatError");
-  it.todo("розпізнає маркер добового free-ліміту через formatError");
+  it.todo("безпечно форматує HTTP 429 через formatError");
 
   // UserFacingError проходить без маскування; інше маскується.
   it.todo("пропускає повідомлення UserFacingError через formatError");
@@ -438,12 +405,11 @@ describe("CLI helpers — завдання студента (OpenRouter)", () =>
 
   // requestAnswer() через mock ChatClient:
   it.todo("повертає текст і фактичну модель відповіді через mock");
-  it.todo("підставляє дефолтні model, effort і max_tokens у запит");
+  it.todo("підставляє дефолтні model, effort і max_completion_tokens в запит");
   it.todo("відхиляє порожній text через mock");
 
-  // Acceptance: основна модель має безкоштовний тариф; .env.example без ключів.
-  it.todo("перевіряє, що основна модель позначена безкоштовним тарифом");
-  it.todo("перевіряє, що .env.example не містить реального ключа");
+  // Перевірка погодженого model config та shared root env example.
+  it.todo("перевіряє синхронізацію з конфігурацією кореневого .env.example");
 });
 ```
 

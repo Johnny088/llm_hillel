@@ -1,9 +1,13 @@
-import { access, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  applySafeSync,
   assertRepositoryEnvironmentReady,
+  compareDirectories,
+  ensureRepositoryEnvironmentFile,
+  preserveLesson01LocalEnvironment,
   removeDevLocalEnvironmentFiles,
 } from "../../scripts/dev-manager.js";
 
@@ -31,19 +35,46 @@ afterEach(async () => {
 });
 
 describe("dev-manager environment boundary", () => {
-  it("keeps the Lesson 01 local env contract", async () => {
+  it("creates the root env from the example once and preserves existing user values", async () => {
     const root = await createTemporaryRoot();
+    const example = "OPENROUTER_API_KEY=replace-me\nOPENROUTER_MODEL=sample\n";
+    await writeFile(join(root, ".env.example"), example, "utf8");
 
     await expect(assertRepositoryEnvironmentReady(1, root)).resolves.toBeUndefined();
+    await expect(ensureRepositoryEnvironmentFile(root)).resolves.toBe(false);
+    await expect(readFile(join(root, ".env"), "utf8")).resolves.toBe(example);
+    const userValues = "OPENROUTER_API_KEY=existing-user-value\n";
+    await writeFile(join(root, ".env"), userValues, "utf8");
+    await expect(assertRepositoryEnvironmentReady(1, root)).resolves.toBeUndefined();
+    await expect(readFile(join(root, ".env"), "utf8")).resolves.toBe(userValues);
+  });
+
+  it("preserves the old dev/.env during Lesson 01 sync", async () => {
+    const root = await createTemporaryRoot();
+    const dev = join(root, "dev");
+    const starter = join(root, "starter");
+    const localEnvironment = "OPENROUTER_API_KEY=local-fixture\n";
+    await mkdir(dev);
+    await mkdir(starter);
+    await writeFile(join(dev, ".env"), localEnvironment, "utf8");
+    await writeFile(join(dev, "README.md"), "old starter\n", "utf8");
+    await writeFile(join(starter, "README.md"), "new starter\n", "utf8");
+
+    const diff = await compareDirectories(dev, starter);
+    await applySafeSync(starter, preserveLesson01LocalEnvironment(diff), dev, false);
+
+    await expect(readFile(join(dev, ".env"), "utf8")).resolves.toBe(localEnvironment);
+    await expect(readFile(join(dev, "README.md"), "utf8")).resolves.toBe("new starter\n");
   });
 
   it("does not remove a local key when the repository env is not ready", async () => {
     const root = await createTemporaryRoot();
     const dev = join(root, "dev");
     await mkdir(dev);
+    await writeFile(join(root, ".env.example"), "OPENROUTER_API_KEY=\n", "utf8");
     await writeFile(join(dev, ".env"), "OPENROUTER_API_KEY=local-secret\n", "utf8");
 
-    await expect(assertRepositoryEnvironmentReady(2, root)).rejects.toThrow("кореневий .env");
+    await expect(assertRepositoryEnvironmentReady(2, root)).rejects.toThrow("OPENROUTER_API_KEY");
     await expect(pathExists(join(dev, ".env"))).resolves.toBe(true);
   });
 

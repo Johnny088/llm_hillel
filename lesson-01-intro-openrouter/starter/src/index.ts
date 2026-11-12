@@ -1,23 +1,16 @@
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import dotenv from "dotenv";
 import OpenAI from "openai";
 import {
   OPENROUTER_BASE_URL,
   formatError,
   loadEnvironment,
+  loadRootEnvironment,
   readUserInput,
   requestAnswer,
   type ChatClient,
 } from "./cli.js";
 
-const localEnvPath = resolve(dirname(fileURLToPath(import.meta.url)), "../.env");
-
-dotenv.config({ quiet: true, path: localEnvPath });
-dotenv.config({ quiet: true });
-
 async function main(): Promise<void> {
-  const environment = loadEnvironment(process.env);
+  const environment = loadEnvironment(loadRootEnvironment(import.meta.url));
   const input = readUserInput(process.argv.slice(2));
 
   console.log("\n📤 Надіслано:");
