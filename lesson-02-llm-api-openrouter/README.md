@@ -41,6 +41,14 @@ Remove-Item Env:OPENROUTER_MODEL,Env:OPENROUTER_MODEL_FAST,Env:OPENROUTER_MODEL_
 yarn demo:lesson02:openrouter:solution
 ```
 
+```
+ In my case for linux
+
+ unset OPENROUTER_MODEL OPENROUTER_MODEL_FAST OPENROUTER_MODEL_MAIN \
+      OPENROUTER_REASONING_EFFORT OPENROUTER_MAX_OUTPUT_TOKENS
+
+```
+
 Очищення model-змінних прибирає тимчасові override з попередніх запусків;
 після цього команда читає актуальну конфігурацію з кореневого `.env`.
 
@@ -180,6 +188,10 @@ env-файли — відсутні.
 Тільки після цього зупиніть сервер у першому терміналі (`Ctrl+C`).
 Далі: `yarn tsc -p tsconfig.dev.json --noEmit` — без помилок; `yarn vitest run --dir dev/tests` — `5 passed` і
 `12 todo`. Повна публічна процедура переходу наведена в цьому розділі.
+
+```
+yarn dev:my:lesson02:openrouter & sleep 9; curl -s http://127.0.0.1:3000/health; pkill -f "my-dev/lesson-02"
+```
 
 ## Моделі, вартість і приватність
 
