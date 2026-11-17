@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "sourceMap": true,
+    "rootDir": "./lesson-02-llm-api/solution/src",
+    "outDir": "./dist/lesson-02-llm-api"
+  },
+  "include": ["lesson-02-llm-api/solution/src/**/*.ts"],
+  "exclude": [
+    "lesson-02-llm-api/solution/tests/**/*.ts",
+    "lesson-02-llm-api/solution/evals/**/*.ts"
+  ]
+}
