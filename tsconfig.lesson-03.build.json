@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "sourceMap": true,
+    "rootDir": "./lesson-03-function-calling/solution/src",
+    "outDir": "./dist/lesson-03-function-calling"
+  },
+  "include": ["lesson-03-function-calling/solution/src/**/*.ts"],
+  "exclude": ["lesson-03-function-calling/solution/tests/**/*.ts"]
+}
