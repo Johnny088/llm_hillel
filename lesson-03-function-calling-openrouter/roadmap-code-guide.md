@@ -2697,7 +2697,7 @@ export function scoreToolCallingCase(
 }
 ```
 
-**Перевірка:** `rg -n "scoreToolCallingCase" my-dev/lesson-03-function-calling-openrouter/evals/tool-calling-scorer.ts`. Виконайте її після створення всіх залежностей цього блока. Очікується exit code 0 для завершеного етапу; якщо шлях або контракт не збігається, збережіть уже прийняті кроки: звірте шлях та anchor цього блока, виправте саме його й повторіть наведену перевірку.
+**Перевірка:** `grep -n "scoreToolCallingCase" my-dev/lesson-03-function-calling-openrouter/evals/tool-calling-scorer.ts`. Виконайте її після створення всіх залежностей цього блока. Очікується exit code 0 для завершеного етапу; якщо шлях або контракт не збігається, збережіть уже прийняті кроки: звірте шлях та anchor цього блока, виправте саме його й повторіть наведену перевірку.
 
 ### S15. Створити recorded eval runner
 

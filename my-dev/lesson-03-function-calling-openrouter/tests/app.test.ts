@@ -1,0 +1,476 @@
+import type { Server } from "node:http";
+import type { AddressInfo } from "node:net";
+import { once } from "node:events";
+import { describe, expect, it, vi } from "vitest";
+import { createApp, type AppDependencies } from "../src/app.js";
+import { DocumentAiError } from "../src/lib/errors.js";
+import type {
+  DocumentAi,
+  ExtractionResult,
+  SummaryStreamEvent,
+} from "../src/services/document-ai.js";
+
+const successfulExtraction: ExtractionResult = {
+  data: {
+    names: ["Олена Коваль"],
+    dates: ["14 липня"],
+    locations: ["Львова"],
+    summary: "Олена Коваль приїхала до Львова 14 липня.",
+  },
+  model: "test-main",
+  usage: {
+    input_tokens: 1_000,
+    output_tokens: 500,
+    total_tokens: 1_500,
+    input_tokens_details: {
+      cached_tokens: 200,
+      cache_write_tokens: 100,
+    },
+  },
+};
+
+const successfulStream: SummaryStreamEvent[] = [
+  { type: "delta", delta: "Короткий " },
+  { type: "delta", delta: "підсумок." },
+  {
+    type: "completed",
+    model: "test-fast",
+    usage: {
+      input_tokens: 100,
+      output_tokens: 20,
+      total_tokens: 120,
+      input_tokens_details: {
+        cached_tokens: 25,
+        cache_write_tokens: 0,
+      },
+    },
+  },
+];
+
+function createFakeAi(options?: {
+  extraction?: () => Promise<ExtractionResult>;
+  stream?: readonly SummaryStreamEvent[];
+  streamError?: Error;
+}): DocumentAi {
+  return {
+    extract: options?.extraction ?? (async () => successfulExtraction),
+    streamSummary: async function* () {
+      if (options?.streamError) {
+        throw options.streamError;
+      }
+
+      for (const event of options?.stream ?? successfulStream) {
+        yield event;
+      }
+    },
+  };
+}
+
+async function startTestServer(
+  dependencies: AppDependencies,
+): Promise<{ baseUrl: string; close: () => Promise<void> }> {
+  const server: Server = createApp(dependencies).listen(0);
+  await once(server, "listening");
+  const address = server.address() as AddressInfo;
+
+  return {
+    baseUrl: `http://127.0.0.1:${address.port}`,
+    close: async () => {
+      server.closeAllConnections();
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => {
+          if (error) {
+            reject(error);
+          } else {
+            resolve();
+          }
+        });
+      });
+    },
+  };
+}
+
+async function postJson(baseUrl: string, path: string, body: unknown): Promise<Response> {
+  return fetch(`${baseUrl}${path}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+describe("document API", () => {
+  it("exposes a health endpoint", async () => {
+    const server = await startTestServer({ ai: createFakeAi() });
+
+    try {
+      const response = await fetch(`${server.baseUrl}/health`);
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({ status: "ok" });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("rejects invalid input before calling the extraction service", async () => {
+    const extract = vi.fn(async () => successfulExtraction);
+    const server = await startTestServer({
+      ai: createFakeAi({ extraction: extract }),
+    });
+
+    try {
+      const response = await postJson(server.baseUrl, "/api/documents/extract", { content: "   " });
+
+      expect(response.status).toBe(400);
+      expect(extract).not.toHaveBeenCalled();
+      await expect(response.json()).resolves.toMatchObject({
+        error: { code: "INVALID_INPUT" },
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("returns a stable error for malformed JSON", async () => {
+    const server = await startTestServer({ ai: createFakeAi() });
+
+    try {
+      const response = await fetch(`${server.baseUrl}/api/documents/extract`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: '{"content":"test",}',
+      });
+
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({
+        error: {
+          code: "MALFORMED_JSON",
+          message: "Тіло запиту містить невалідний JSON.",
+        },
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("rejects an oversized JSON body before model invocation", async () => {
+    const extract = vi.fn(async () => successfulExtraction);
+    const server = await startTestServer({
+      ai: createFakeAi({ extraction: extract }),
+    });
+
+    try {
+      const response = await postJson(server.baseUrl, "/api/documents/extract", {
+        content: "x".repeat(40_000),
+      });
+
+      expect(response.status).toBe(413);
+      expect(extract).not.toHaveBeenCalled();
+      await expect(response.json()).resolves.toMatchObject({
+        error: { code: "PAYLOAD_TOO_LARGE" },
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("returns typed extraction data, usage and measured cost", async () => {
+    const times = [100, 145];
+    const server = await startTestServer({
+      ai: createFakeAi(),
+      now: () => times.shift() ?? 145,
+      prices: {
+        "test-main": {
+          inputCostPerMillion: 10,
+          cachedInputCostPerMillion: 1,
+          cacheWriteCostPerMillion: 12.5,
+          outputCostPerMillion: 20,
+        },
+      },
+    });
+
+    try {
+      const response = await postJson(server.baseUrl, "/api/documents/extract", {
+        content: "14 липня Олена Коваль приїхала до Львова.",
+      });
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body).toMatchObject({
+        data: successfulExtraction.data,
+        usage: {
+          inputTokens: 1_000,
+          outputTokens: 500,
+          cachedTokens: 200,
+          cacheWriteTokens: 100,
+        },
+        metrics: {
+          model: "test-main",
+          totalLatencyMs: 45,
+          cacheHitRate: 0.2,
+          pricingAvailable: true,
+        },
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("returns unknown-model pricing signals instead of fake zero cost", async () => {
+    const server = await startTestServer({ ai: createFakeAi() });
+
+    try {
+      const response = await postJson(server.baseUrl, "/api/documents/extract", {
+        content: "Синтетичний документ.",
+      });
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body.metrics).toMatchObject({
+        model: "test-main",
+        estimatedCostUsd: null,
+        pricingAvailable: false,
+        pricingUnavailableReason: "MODEL_NOT_CONFIGURED",
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("maps typed provider errors to a stable JSON contract", async () => {
+    const server = await startTestServer({
+      ai: createFakeAi({
+        extraction: async () => {
+          throw new DocumentAiError("REQUEST_REFUSED", "Модель відхилила запит.", 422);
+        },
+      }),
+    });
+
+    try {
+      const response = await postJson(server.baseUrl, "/api/documents/extract", {
+        content: "Синтетичний документ.",
+      });
+
+      expect(response.status).toBe(422);
+      await expect(response.json()).resolves.toEqual({
+        error: {
+          code: "REQUEST_REFUSED",
+          message: "Модель відхилила запит.",
+        },
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("does not leak provider details into the public error contract", async () => {
+    const server = await startTestServer({
+      ai: createFakeAi({
+        extraction: async () => {
+          throw new DocumentAiError(
+            "UPSTREAM_RATE_LIMITED",
+            "OpenRouter тимчасово обмежив частоту запитів.",
+            429,
+            {
+              status: 429,
+              requestId: "req_secret_123",
+            },
+          );
+        },
+      }),
+    });
+
+    try {
+      const response = await postJson(server.baseUrl, "/api/documents/extract", {
+        content: "Синтетичний документ.",
+      });
+      const body = await response.json();
+
+      expect(response.status).toBe(429);
+      expect(body.error.code).toBe("UPSTREAM_RATE_LIMITED");
+      expect(JSON.stringify(body)).not.toContain("req_secret_123");
+      expect(JSON.stringify(body)).not.toContain("sk-");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("streams named delta, usage and done events", async () => {
+    const times = [100, 125, 180];
+    const server = await startTestServer({
+      ai: createFakeAi(),
+      now: () => times.shift() ?? 180,
+    });
+
+    try {
+      const response = await postJson(server.baseUrl, "/api/documents/summary/stream", {
+        content: "Синтетичний документ.",
+      });
+      const body = await response.text();
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get("content-type")).toContain("text/event-stream");
+      expect(body).toContain('event: delta\ndata: {"delta":"Короткий "}\n\n');
+      expect(body).toContain('"ttftMs":25');
+      expect(body).toContain('"totalLatencyMs":80');
+      expect(body).toContain('"cacheHitRate":0.25');
+      expect(body).toContain('event: done\ndata: {"status":"completed"}\n\n');
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("emits an SSE error and no done event for incomplete generation", async () => {
+    const server = await startTestServer({
+      ai: createFakeAi({
+        stream: [
+          { type: "delta", delta: "Початок" },
+          { type: "incomplete", reason: "max_output_tokens" },
+        ],
+      }),
+    });
+
+    try {
+      const response = await postJson(server.baseUrl, "/api/documents/summary/stream", {
+        content: "Синтетичний документ.",
+      });
+      const body = await response.text();
+
+      expect(body).toContain('"code":"INCOMPLETE_RESPONSE"');
+      expect(body).toContain('"reason":"max_output_tokens"');
+      expect(body).not.toContain("event: done");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("maps a mid-stream OpenRouter rate limit to a stable SSE error", async () => {
+    const server = await startTestServer({
+      ai: createFakeAi({
+        stream: [{ type: "failed", reason: "rate_limit_exceeded" }],
+      }),
+    });
+
+    try {
+      const response = await postJson(server.baseUrl, "/api/documents/summary/stream", {
+        content: "Синтетичний документ.",
+      });
+      const body = await response.text();
+
+      expect(body).toContain('"code":"UPSTREAM_RATE_LIMITED"');
+      expect(body).toContain('"reason":"rate_limit_exceeded"');
+      expect(body).not.toContain("event: done");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("emits an SSE refusal after receiving the terminal response", async () => {
+    const server = await startTestServer({
+      ai: createFakeAi({
+        stream: [{ type: "refused" }, { type: "completed", model: "test-fast" }],
+      }),
+    });
+
+    try {
+      const response = await postJson(server.baseUrl, "/api/documents/summary/stream", {
+        content: "Синтетичний документ.",
+      });
+      const body = await response.text();
+
+      expect(body).toContain('"code":"REQUEST_REFUSED"');
+      expect(body).not.toContain("event: done");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("detects a stream that ends without a terminal event", async () => {
+    const server = await startTestServer({
+      ai: createFakeAi({ stream: [{ type: "delta", delta: "Незавершено" }] }),
+    });
+
+    try {
+      const response = await postJson(server.baseUrl, "/api/documents/summary/stream", {
+        content: "Синтетичний документ.",
+      });
+      const body = await response.text();
+
+      expect(body).toContain('"code":"STREAM_ENDED_UNEXPECTEDLY"');
+      expect(body).not.toContain("event: done");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("maps a thrown stream error to the named SSE error contract", async () => {
+    const server = await startTestServer({
+      ai: createFakeAi({
+        streamError: new DocumentAiError(
+          "GATEWAY_TIMEOUT",
+          "Перевищено час очікування відповіді OpenRouter API.",
+          504,
+        ),
+      }),
+    });
+
+    try {
+      const response = await postJson(server.baseUrl, "/api/documents/summary/stream", {
+        content: "Синтетичний документ.",
+      });
+      const body = await response.text();
+
+      expect(body).toContain('"code":"GATEWAY_TIMEOUT"');
+      expect(body).not.toContain("event: done");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("aborts the upstream stream after the HTTP client disconnects", async () => {
+    let upstreamSignal: AbortSignal | undefined;
+    let markStreamStarted: (() => void) | undefined;
+    const streamStarted = new Promise<void>((resolve) => {
+      markStreamStarted = resolve;
+    });
+    const ai: DocumentAi = {
+      extract: async () => successfulExtraction,
+      streamSummary: async function* (_content, signal) {
+        upstreamSignal = signal;
+        markStreamStarted?.();
+        yield { type: "delta", delta: "Початок" };
+        await new Promise<void>((resolve) => {
+          if (signal.aborted) {
+            resolve();
+            return;
+          }
+
+          signal.addEventListener("abort", () => resolve(), { once: true });
+        });
+      },
+    };
+    const server = await startTestServer({ ai });
+    const clientController = new AbortController();
+
+    try {
+      const response = await fetch(`${server.baseUrl}/api/documents/summary/stream`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ content: "Синтетичний документ." }),
+        signal: clientController.signal,
+      });
+      const reader = response.body?.getReader();
+
+      expect(response.status).toBe(200);
+      expect(reader).toBeDefined();
+      await streamStarted;
+      await reader?.read();
+      clientController.abort();
+
+      await vi.waitFor(() => expect(upstreamSignal?.aborted).toBe(true));
+    } finally {
+      clientController.abort();
+      await server.close();
+    }
+  });
+});
