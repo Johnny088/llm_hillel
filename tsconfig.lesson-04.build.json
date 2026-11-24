@@ -1,0 +1,18 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "sourceMap": true,
+    "rootDir": ".",
+    "outDir": "./dist/lesson-04-mcp-built-in-tools"
+  },
+  "include": [
+    "lesson-03-function-calling/solution/src/**/*.ts",
+    "lesson-04-mcp-built-in-tools/solution/src/**/*.ts"
+  ],
+  "exclude": [
+    "lesson-03-function-calling/solution/tests/**/*.ts",
+    "lesson-04-mcp-built-in-tools/solution/tests/**/*.ts"
+  ]
+}
