@@ -1565,7 +1565,7 @@ export async function createLesson04Runtime(
 }
 ```
 
-**Перевірка:** `tests/server-lifecycle.test.ts` and copied-tree smoke. Очікується pass без provider request. Якщо буквальний якір відсутній або перевірка падає, зупиніться на цьому файлі та порівняйте його зі starter; не відновлюйте повний файл з solution.
+**Перевірка:** `yarn vitest tests/server-lifecycle.test.ts` and copied-tree smoke. Очікується pass без provider request. Якщо буквальний якір відсутній або перевірка падає, зупиніться на цьому файлі та порівняйте його зі starter; не відновлюйте повний файл з solution.
 
 #### `my-dev/lesson-04-mcp-built-in-tools-openrouter/tests/app.test.ts`
 
@@ -1699,7 +1699,7 @@ export async function createLesson04Runtime(
 +});
 ```
 
-**Перевірка:** `tests/app.test.ts`: preserve all 15 inherited API tests and add four research cases. Очікується pass без provider request. Якщо буквальний якір відсутній або перевірка падає, зупиніться на цьому файлі та порівняйте його зі starter; не відновлюйте повний файл з solution.
+**Перевірка:** `yarn vitest tests/app.test.ts`: preserve all 15 inherited API tests and add four research cases. Очікується pass без provider request. Якщо буквальний якір відсутній або перевірка падає, зупиніться на цьому файлі та порівняйте його зі starter; не відновлюйте повний файл з solution.
 
 Payloads додають local `src/runtime.ts`, мінімальний optional `mcpAgent` до `Lesson04AppDependencies`, `POST /api/agent/research` і нові tests в локальному `tests/app.test.ts`. Default sandbox обчислюється від `import.meta.url` до `../sandbox`; optional `allowedDirectory` розв'язується від директорії runtime module. Закривайте MCP при startup failure й idempotently в runtime close. Не імпортуйте source з `solution/`.
 

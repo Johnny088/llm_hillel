@@ -2,8 +2,9 @@ import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { once } from "node:events";
 import { describe, expect, it, vi } from "vitest";
-import { createApp, type AppDependencies } from "../src/app.js";
+import { createApp, type Lesson04AppDependencies } from "../src/app.js";
 import { DocumentAiError } from "../src/lib/errors.js";
+import type { ToolCallingAgent } from "../src/services/tool-calling-agent.js";
 import type {
   DocumentAi,
   ExtractionResult,
@@ -67,7 +68,7 @@ function createFakeAi(options?: {
 }
 
 async function startTestServer(
-  dependencies: AppDependencies,
+  dependencies: Lesson04AppDependencies,
 ): Promise<{ baseUrl: string; close: () => Promise<void> }> {
   const server: Server = createApp(dependencies).listen(0);
   await once(server, "listening");
@@ -470,6 +471,102 @@ describe("document API", () => {
       await vi.waitFor(() => expect(upstreamSignal?.aborted).toBe(true));
     } finally {
       clientController.abort();
+      await server.close();
+    }
+  });
+});
+
+describe("POST /api/agent/research (OpenRouter)", () => {
+  it("зберігає health endpoint попереднього проєкту", async () => {
+    const server = await startTestServer({ ai: createFakeAi() });
+
+    try {
+      const response = await fetch(`${server.baseUrl}/health`);
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({ status: "ok" });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("перевикористовує AgentRequestSchema до запуску MCP runtime", async () => {
+    const run = vi.fn<ToolCallingAgent["run"]>();
+    const server = await startTestServer({ ai: createFakeAi(), mcpAgent: { run } });
+
+    try {
+      const response = await postJson(server.baseUrl, "/api/agent/research", { message: "   " });
+
+      expect(response.status).toBe(400);
+      expect(run).not.toHaveBeenCalled();
+      await expect(response.json()).resolves.toMatchObject({
+        error: { code: "INVALID_INPUT" },
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("передає нормалізований запит MCP-агенту", async () => {
+    const run = vi.fn<ToolCallingAgent["run"]>().mockResolvedValue({
+      status: "success",
+      text: "Файл прочитано.",
+      model: "configured-model",
+      usage: {
+        inputTokens: 10,
+        outputTokens: 5,
+        totalTokens: 15,
+        cachedTokens: 0,
+        cacheWriteTokens: 0,
+      },
+      metrics: {
+        modelCallCount: 2,
+        toolCallCount: 1,
+        retryCount: 0,
+        totalLatencyMs: 25,
+      },
+    });
+    const server = await startTestServer({ ai: createFakeAi(), mcpAgent: { run } });
+
+    try {
+      const response = await postJson(server.baseUrl, "/api/agent/research", {
+        message: "  Прочитай notes.txt  ",
+      });
+
+      expect(response.status).toBe(200);
+      expect(run).toHaveBeenCalledWith("Прочитай notes.txt");
+      await expect(response.json()).resolves.toMatchObject({
+        status: "success",
+        metrics: {
+          modelCallCount: 2,
+          toolCallCount: 1,
+        },
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("маскує внутрішню помилку MCP runtime", async () => {
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const run = vi
+      .fn<ToolCallingAgent["run"]>()
+      .mockRejectedValue(new Error("secret-upstream-details"));
+    const server = await startTestServer({ ai: createFakeAi(), mcpAgent: { run } });
+
+    try {
+      const response = await postJson(server.baseUrl, "/api/agent/research", {
+        message: "Прочитай файл.",
+      });
+      const serializedBody = JSON.stringify(await response.json());
+
+      expect(response.status).toBe(502);
+      expect(serializedBody).toContain("MCP_AGENT_ERROR");
+      expect(serializedBody).not.toContain("secret-upstream-details");
+      expect(errorLog).toHaveBeenCalledWith("[MCP Agent Error]", {
+        errorName: "Error",
+      });
+    } finally {
       await server.close();
     }
   });
