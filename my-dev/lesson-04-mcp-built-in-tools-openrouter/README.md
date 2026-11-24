@@ -1,44 +1,49 @@
-# Lesson 04 OpenRouter – успадкована основа starter
+# Lesson 04 OpenRouter – завершена практика
 
-Ця папка фізично походить від готового Lesson 03 OpenRouter solution. Усі успадковані файли збережено зі своїми шляхами та вмістом; спеціальний файл final-project-ideas.md описує напрямок цієї практики. У starter немає прихованого готового MCP runtime чи lesson-specific 501 scaffold. Одноразово створіть кандидат командою `yarn student:init 04 openrouter`; canonical baseline gate нижче перевіряє тільки канонічний starter.
+Застосунок зберігає API заняття 03 і додає локальний файловий Model Context Protocol (MCP) та вебпошук OpenRouter. Маршрут `POST /api/agent/research` приймає JSON із `message` і повертає `status`, `text`, `model`, `usage` та `metrics`. Графічного інтерфейсу немає.
 
-## Підготовка та baseline
+## Перевірка без запитів до моделі
 
-Команди запускаються з кореня репозиторію, де лежить package.json:
-
-```powershell
-yarn verify:lesson04:openrouter:scaffolding
-```
-
-Очікується підтвердження exact Lesson 04 OpenRouter inheritance. Gate перевіряє канонічну копію, а не виконує нову функцію. Успішні успадковані тести та eval лише підтверджують, що стартова основа справна.
-
-Для перегляду цієї основи використовується окрема solution папка:
-
-```powershell
-yarn demo:lesson04:openrouter:solution
-```
-
-Демонстрація робить live provider-запити. Вона необов'язкова і може витратити баланс. Для offline і local перевірок дивіться README готового solution.
-
-## Що потрібно додати у власній папці
-
-Roadmap веде від робочої успадкованої основи до Lesson 04 поведінки:
-
-- local filesystem Model Context Protocol (MCP) client через stdio із доступом лише до потрібного текстового інструмента;
-- перевірку model-facing tool allowlist та sandbox-relative path;
-- hosted OpenRouter web search;
-- research-agent і локальний endpoint, що поєднує успадковану HTTP основу з новими інструментами;
-- offline unit сценарії для помилок, tool routing, метрик і завершення;
-- local Model Context Protocol (MCP) smoke, що запускає справжній subprocess і підтверджує cleanup.
-
-Поточний starter не має прихованої Lesson 04 реалізації: цей код створюється покроково лише в my-dev/lesson-04-mcp-built-in-tools-openrouter/. Не замінюйте його готовим solution і не додавайте залежностей на файли з sibling-папки під час виконання.
-
-## Команди у власній папці
-
-До завершення роботи використовуйте команду завершеності:
+З кореня репозиторію, де лежить `package.json`, виконується:
 
 ```powershell
 yarn check:my:lesson04:openrouter
 ```
 
-Окремий baseline gate і окремий completion gate мають різні цілі. Те, що inherited tests проходять, не доводить появу MCP client, research endpoint чи нових тестів. Дивіться [roadmap](../roadmap-code-guide.md) для точних змін і проміжних очікувань.
+Очікуються зелені перевірки типів, lint, форматування, тести без failed/todo/skipped, три записані eval-набори по 5/5 та `PASS filesystem MCP`. Completion gate запускає додаткові тести проти фактичного коду цієї папки. Записані відповіді не підтверджують поточну доступність провайдера.
+
+Окремі локальні перевірки:
+
+```powershell
+node scripts/run-tsx-entrypoint.mjs my-dev/lesson-04-mcp-built-in-tools-openrouter/evals/run.ts --mode=all
+node scripts/run-tsx-entrypoint.mjs my-dev/lesson-04-mcp-built-in-tools-openrouter/evals/run-tool-calling.ts
+node scripts/run-tsx-entrypoint.mjs my-dev/lesson-04-mcp-built-in-tools-openrouter/scripts/smoke-filesystem-mcp.ts
+```
+
+Перші дві команди відтворюють записані дані. Третя запускає справжній filesystem MCP server через Node.js і stdio, читає синтетичний дозволений файл, перевіряє відмову поза каталогом та для недозволеного інструмента, закриває client і transport та очікує завершення дочірнього процесу. Тимчасові файли прибираються після перевірки.
+
+## Необов’язкова HTTP-демонстрація з моделлю
+
+Потрібен власний `OPENROUTER_API_KEY` у кореневому `.env`. Research-запит викликає модель і може витрачати баланс, навіть коли запит стосується лише локального файла. Цей запуск не входить до перевірки без провайдера.
+
+У першому терміналі з кореня репозиторію запускається:
+
+```powershell
+node scripts/run-tsx-entrypoint.mjs my-dev/lesson-04-mcp-built-in-tools-openrouter/src/server.ts
+```
+
+Процес продовжує працювати до зупинки. MCP server отримує доступ лише до `sandbox/` цієї робочої папки; параметр runtime `allowedDirectory` задає інший дозволений каталог у контрольованому сценарії. Модель бачить тільки `read_text_file`.
+
+У другому терміналі надсилається:
+
+```powershell
+Invoke-RestMethod -Method Post -Uri http://localhost:3000/api/agent/research -ContentType 'application/json' -Body '{"message":"Прочитай notes.txt і коротко підсумуй його."}'
+```
+
+Очікується відповідь із `status`, текстом і метриками. Текст та числові значення залежать від моделі. `Ctrl+C` у першому терміналі закриває HTTP server і його MCP subprocess. Вебпошук виконується на стороні OpenRouter окремо від локального файлового MCP.
+
+## Походження коду та відновлення
+
+Початкова папка є фізичною копією solution заняття 03. Після виконання roadmap нові модулі, маршрут, тести й eval додаються локально; імпортів готового solution немає. Початковий зелений набір підтверджує лише справність успадкованої основи, а кількість сценаріїв записуйте за фактичним підсумком runner-а.
+
+Подальші дії та точні кроки наведені в [roadmap](./roadmap-code-guide.md), а захист наявної роботи – у [гайді підготовки](./dev-migration-guide.md). Якщо перевірка падає, досліджується перший названий файл або assertion; робоча папка не перезаписується готовим solution.

@@ -1,29 +1,25 @@
-# Lesson 03 (OpenRouter) – перевірки solution
+# Lesson 04 OpenRouter – перевірки eval
 
-## Offline recorded checks
+## Відтворення записаних відповідей
 
-Запустіть успадкований extraction replay та новий Lesson 03 tool-calling replay:
-
-```powershell
-yarn eval:lesson03:openrouter:solution
-```
-
-Команда читає локальні recorded observations і не звертається до мережі. Extraction runner перевіряє успадковану поведінку document extraction. Tool runner перевіряє п'ять записаних сценаріїв: вибір інструмента, нормалізацію аргументів, уточнення, контрольовану помилку та пряму відповідь без tool call. Replay підтверджує лише recorded pipeline, а не поточну поведінку моделі чи доступність catalog. Записуйте фактичну кількість cases і success rate з виводу.
-
-## Необов'язковий live tool-calling run
+З кореня репозиторію запускаються три незалежні набори:
 
 ```powershell
-yarn eval:lesson03:openrouter:solution:live
+node scripts/run-tsx-entrypoint.mjs my-dev/lesson-04-mcp-built-in-tools-openrouter/evals/run.ts
+node scripts/run-tsx-entrypoint.mjs my-dev/lesson-04-mcp-built-in-tools-openrouter/evals/run.ts --mode=extraction
+node scripts/run-tsx-entrypoint.mjs my-dev/lesson-04-mcp-built-in-tools-openrouter/evals/run-tool-calling.ts
 ```
 
-Команда надсилає реальні provider requests для п'яти tool-calling сценаріїв, а потім звіряє налаштовані model IDs, зареєстровані ціни й оголошені capabilities з публічним catalog. Tool route передає одну налаштовану модель на запит. Перевірка може використати платні tokens і залежить від поточних відповідей провайдера та catalog; вона не потрібна для offline acceptance gate.
+Звичайний `run.ts` перевіряє п’ять MCP-сценаріїв: два локальні читання, два спостереження вебпошуку й відмову поза дозволеним каталогом. `--mode=extraction` перевіряє п’ять успадкованих extraction-сценаріїв; окремий tool-calling runner перевіряє п’ять успадкованих валютних сценаріїв. Дані вже записані, запитів до OpenRouter немає.
 
-## Необов'язковий live extraction run
+Extraction і MCP можна перевірити разом:
 
 ```powershell
-yarn eval:lesson03:openrouter:solution:live:extraction
+node scripts/run-tsx-entrypoint.mjs my-dev/lesson-04-mcp-built-in-tools-openrouter/evals/run.ts --mode=all
 ```
 
-Команда надсилає успадковані extraction cases до налаштованих document models. Це окрема перевірка від live tool-calling run, вона також може використати баланс провайдера.
+Очікуються extraction 5/5 та MCP 5/5. Результат цього відтворення не підтверджує поточну доступність моделі або вебпошуку.
 
-Offline replay, live inference і live catalog check є окремими доказами. Не подавайте один як підтвердження іншого.
+## Необов’язкові реальні запити
+
+`run.ts --live` запускає MCP demo; `run.ts --mode=extraction --live` надсилає реальні extraction-запити. Обидва режими потребують власного кореневого `.env`, можуть витрачати баланс і не входять до локального completion gate. Ключі не виводяться у звіт.
