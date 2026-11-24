@@ -2348,7 +2348,7 @@ yarn vitest run --dir my-dev/lesson-04-mcp-built-in-tools-openrouter/tests
  }
 ```
 
-**Перевірка:** `tests/server-lifecycle.test.ts` and copied-tree smoke. Очікується pass без provider request. Якщо буквальний якір відсутній або перевірка падає, зупиніться на цьому файлі та порівняйте його зі starter; не відновлюйте повний файл з solution.
+**Перевірка:** `yarn vitest tests/server-lifecycle.test.ts` and copied-tree smoke. Очікується pass без provider request. Якщо буквальний якір відсутній або перевірка падає, зупиніться на цьому файлі та порівняйте його зі starter; не відновлюйте повний файл з solution.
 
 #### `my-dev/lesson-04-mcp-built-in-tools-openrouter/tests/server-lifecycle.test.ts`
 
