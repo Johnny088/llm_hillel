@@ -173,7 +173,7 @@ async function closeAfterFailedConnect(
 }
 ```
 
-**Перевірка:** `tests/filesystem-client.test.ts`. Очікується pass без provider request. Якщо буквальний якір відсутній або перевірка падає, зупиніться на цьому файлі та порівняйте його зі starter; не відновлюйте повний файл з solution.
+**Перевірка:** `yarn tests/filesystem-client.test.ts`. Очікується pass без provider request. Якщо буквальний якір відсутній або перевірка падає, зупиніться на цьому файлі та порівняйте його зі starter; не відновлюйте повний файл з solution.
 
 #### `my-dev/lesson-04-mcp-built-in-tools-openrouter/tests/filesystem-client.test.ts`
 

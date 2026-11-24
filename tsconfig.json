@@ -19,6 +19,7 @@
   },
   "include": [
     "dev/**/*.ts",
+    "my-dev/**/*.ts",
     "dev/**/*.tsx",
     "lesson-01-intro/starter/src/**/*.ts",
     "lesson-01-intro/starter/tests/**/*.ts",

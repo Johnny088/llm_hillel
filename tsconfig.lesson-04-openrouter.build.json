@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "sourceMap": true,
+    "rootDir": "./lesson-04-mcp-built-in-tools-openrouter/solution/src",
+    "outDir": "./dist/lesson-04-mcp-built-in-tools-openrouter"
+  },
+  "include": ["lesson-04-mcp-built-in-tools-openrouter/solution/src/**/*.ts"],
+  "exclude": ["lesson-04-mcp-built-in-tools-openrouter/solution/tests/**/*.ts"]
+}
