@@ -2569,7 +2569,7 @@ describe("Lesson 04 HTTP and runtime lifecycle", () => {
 });
 ```
 
-**Перевірка:** `tests/server-lifecycle.test.ts` and copied-tree smoke. Очікується pass без provider request. Якщо буквальний якір відсутній або перевірка падає, зупиніться на цьому файлі та порівняйте його зі starter; не відновлюйте повний файл з solution.
+**Перевірка:** `yarn vitest tests/server-lifecycle.test.ts` and copied-tree smoke. Очікується pass без provider request. Якщо буквальний якір відсутній або перевірка падає, зупиніться на цьому файлі та порівняйте його зі starter; не відновлюйте повний файл з solution.
 
 Примусове закриття сервера може спричинити `ECONNRESET` перед подією `close`; сценарій успішний лише після фактичного `close`.
 
@@ -2644,7 +2644,7 @@ export const mcpToolEvalCases: McpEvalCase[] = [
 ];
 ```
 
-**Перевірка:** `evals/run.ts --mode=all` and inherited recorded tool replay. Очікується pass без provider request. Якщо буквальний якір відсутній або перевірка падає, зупиніться на цьому файлі та порівняйте його зі starter; не відновлюйте повний файл з solution.
+**Перевірка:** `evals/run.ts --mode=all` in my case `yarn tsx my-dev/lesson-04-mcp-built-in-tools-openrouter/evals/run.ts --mode=all` and inherited recorded tool replay. Очікується pass без provider request. Якщо буквальний якір відсутній або перевірка падає, зупиніться на цьому файлі та порівняйте його зі starter; не відновлюйте повний файл з solution.
 
 #### `my-dev/lesson-04-mcp-built-in-tools-openrouter/evals/recorded-results.ts`
 
@@ -2940,7 +2940,7 @@ export async function runExtractionEvaluation(live = false): Promise<void> {
    }
 ```
 
-**Перевірка:** `evals/run.ts --mode=all` and inherited recorded tool replay. Очікується pass без provider request. Якщо буквальний якір відсутній або перевірка падає, зупиніться на цьому файлі та порівняйте його зі starter; не відновлюйте повний файл з solution.
+**Перевірка:** `yarn tsx my-dev/lesson-04-mcp-built-in-tools-openrouter/evals/run-tool-calling.ts --mode=all` and inherited recorded tool replay. Очікується pass без provider request. Якщо буквальний якір відсутній або перевірка падає, зупиніться на цьому файлі та порівняйте його зі starter; не відновлюйте повний файл з solution.
 
 #### `my-dev/lesson-04-mcp-built-in-tools-openrouter/evals/run.ts`
 

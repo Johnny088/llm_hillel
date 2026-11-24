@@ -69,3 +69,9 @@ export function scoreExtraction(
 
   return { passed: reasons.length === 0, reasons };
 }
+
+export interface McpEvalScore {
+  id: string;
+  passed: boolean;
+  reasons: string[];
+}

@@ -3,7 +3,7 @@ import { recordedToolResults } from "../evals/recorded-tool-results.js";
 import { classifyTextResponse, scoreToolCallingCase } from "../evals/tool-calling-scorer.js";
 import { toolCallingEvalCases } from "../evals/tool-calling.eval.js";
 
-describe("Lesson 03 tool-calling evals", () => {
+describe("Lesson 04 inherited tool-calling evals", () => {
   it("містить п’ять обов’язкових і унікальних сценаріїв", () => {
     expect(toolCallingEvalCases).toHaveLength(5);
     expect(new Set(toolCallingEvalCases.map((evalCase) => evalCase.id)).size).toBe(5);

@@ -167,7 +167,7 @@ async function main(): Promise<void> {
     const primaryModel = resolveModel("main", environment);
 
     console.log("=================================================================");
-    console.log("  🧪 LIVE EVAL SUITE: LESSON 03 (Tool Calling OpenRouter)");
+    console.log("  🧪 LIVE EVAL SUITE: LESSON 04 (Inherited Tool Calling OpenRouter)");
     console.log("=================================================================");
     console.log(`  ● Основна модель:  ${primaryModel}`);
     console.log(`  ● Reasoning:       ${environment.OPENROUTER_REASONING_EFFORT}`);
@@ -175,7 +175,7 @@ async function main(): Promise<void> {
     console.log("=================================================================");
   } else {
     console.log("=================================================================");
-    console.log("  🧪 OFFLINE EVAL SUITE: LESSON 03 (Deterministic Replay)");
+    console.log("  🧪 OFFLINE EVAL SUITE: LESSON 04 (Inherited Deterministic Replay)");
     console.log("=================================================================");
   }
 

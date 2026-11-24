@@ -1,205 +1,96 @@
-import OpenAI from "openai";
-import { loadEnvironment, loadRepositoryEnvFile } from "../src/config/env.js";
-import { resolveModel } from "../src/config/models.js";
-import { DocumentAiError } from "../src/lib/errors.js";
-import { extractUsageMetrics, type UsageMetrics } from "../src/lib/metrics.js";
-import type { Extraction } from "../src/schemas/extraction.js";
-import { OpenRouterDocumentAi } from "../src/services/openrouter-document-ai.js";
-import { extractionEvalCases } from "./extraction.eval.js";
-import { recordedResults } from "./recorded-results.js";
-import { scoreExtraction } from "./scorer.js";
+import { mcpToolEvalCases } from "./mcp-tools.eval.js";
+import { recordedMcpToolResults } from "./recorded-results.js";
 
-const SUCCESS_THRESHOLD = 0.8;
+import { runExtractionEvaluation } from "./run-extraction.js";
+import { runLiveDemo } from "../src/demo.js";
+import { scoreMcpToolCase } from "./scorer.js";
 
-interface EvalObservation {
-  extraction: Extraction;
-  latencyMs: number;
-  model?: string;
-  usage: UsageMetrics;
-}
+type EvaluationMode = "mcp" | "extraction" | "all";
 
-function emptyUsage(): UsageMetrics {
-  return {
-    inputTokens: 0,
-    outputTokens: 0,
-    totalTokens: 0,
-    cachedTokens: 0,
-    cacheWriteTokens: 0,
-  };
-}
+export async function runRecordedMcpEvaluation(): Promise<void> {
+  const observationsById = new Map(
+    recordedMcpToolResults.map((observation) => [observation.id, observation]),
+  );
+  const scores = mcpToolEvalCases.map((evalCase) => {
+    const observation = observationsById.get(evalCase.id);
 
-function createOfflineRunner(): (id: string) => Promise<EvalObservation> {
-  return async (id) => {
-    const extraction = recordedResults[id];
-
-    if (!extraction) {
-      throw new Error(`Немає recorded result для eval case ${id}.`);
+    if (!observation) {
+      return {
+        id: evalCase.id,
+        passed: false,
+        reasons: ["Відсутнє записане спостереження."],
+      };
     }
 
-    return { extraction, latencyMs: 0, usage: emptyUsage() };
-  };
-}
-
-function createLiveRunner(): (id: string, input: string) => Promise<EvalObservation> {
-  loadRepositoryEnvFile();
-  const environment = loadEnvironment(process.env);
-  const client = new OpenAI({
-    apiKey: environment.OPENROUTER_API_KEY,
-    baseURL: environment.OPENROUTER_BASE_URL,
-    timeout: environment.OPENROUTER_TIMEOUT_MS,
-    maxRetries: 0,
-    defaultHeaders: {
-      "HTTP-Referer": environment.OPENROUTER_HTTP_REFERER,
-      "X-Title": environment.OPENROUTER_APP_TITLE,
-    },
-  });
-  const ai = new OpenRouterDocumentAi(client, {
-    fastModel: resolveModel("fast", environment),
-    mainModel: resolveModel("main", environment),
-    maxOutputTokens: environment.OPENROUTER_MAX_OUTPUT_TOKENS,
-    reasoningEffort: environment.OPENROUTER_REASONING_EFFORT,
+    return scoreMcpToolCase(evalCase, observation);
   });
 
-  return async (_id, input) => {
-    const startedAt = performance.now();
-    const result = await ai.extract(input);
-
-    return {
-      extraction: result.data,
-      latencyMs: Math.max(0, Math.round(performance.now() - startedAt)),
-      model: result.model,
-      usage: extractUsageMetrics(result.usage),
-    };
-  };
-}
-
-function formatValues(values: string[]): string {
-  return values.length > 0 ? values.join(", ") : "не знайдено";
-}
-
-function formatRequestFailure(error: unknown): string {
-  if (error instanceof DocumentAiError) {
-    const upstreamStatus = (error.details as { status?: unknown } | undefined)?.status;
-    const upstream =
-      typeof upstreamStatus === "number" ? `, OpenRouter HTTP ${upstreamStatus}` : "";
-
-    return `${error.code}: HTTP ${error.statusCode}${upstream} — ${error.message}`;
+  for (const score of scores) {
+    const details = score.reasons.length === 0 ? "" : ` – ${score.reasons.join(" ")}`;
+    console.log(`${score.passed ? "PASS" : "FAIL"} ${score.id}${details}`);
   }
 
-  return `request_failed:${error instanceof Error ? error.name : "UnknownError"}`;
+  const passed = scores.filter((score) => score.passed).length;
+
+  const averageLatencyMs =
+    recordedMcpToolResults.reduce((sum, observation) => sum + observation.latencyMs, 0) /
+    recordedMcpToolResults.length;
+
+  console.log(`Result: ${passed}/${scores.length}`);
+  console.log(`Average latency: ${Math.round(averageLatencyMs)}ms`);
+
+  if (passed !== scores.length) {
+    process.exitCode = 1;
+  }
 }
 
-function printLiveObservation(
-  observation: EvalObservation,
-  passed: boolean,
-  reasons: string[],
-): void {
-  console.log("  🤖 Отримано від моделі:");
-  console.log(`     • Модель:      ${observation.model ?? "не вказано"}`);
-  console.log(
-    `     • Метрики:     ⏱️ ${(observation.latencyMs / 1_000).toFixed(1)} с | 🎫 ${observation.usage.totalTokens} токенів (${observation.usage.inputTokens} вхід + ${observation.usage.outputTokens} вихід)`,
-  );
-  console.log(`     • Імена:       ${formatValues(observation.extraction.names)}`);
-  console.log(`     • Дати:        ${formatValues(observation.extraction.dates)}`);
-  console.log(`     • Місця:       ${formatValues(observation.extraction.locations)}`);
-  console.log("     • Підсумок:");
-  const summaryLines = observation.extraction.summary.trim().split("\n");
-  for (const line of summaryLines) {
-    console.log(`       │ ${line}`);
+function parseMode(arguments_: readonly string[]): EvaluationMode | undefined {
+  const modeArguments = arguments_.filter((argument) => argument.startsWith("--mode="));
+
+  if (modeArguments.length > 1) {
+    return undefined;
   }
-  console.log(
-    passed
-      ? "\n  ✔  PASS — відповідь відповідає очікуваному результату."
-      : `\n  ✖  FAIL — ${reasons.join(", ")}`,
-  );
+
+  const mode = modeArguments[0]?.slice("--mode=".length) ?? "mcp";
+
+  return mode === "mcp" || mode === "extraction" || mode === "all" ? mode : undefined;
 }
 
 async function main(): Promise<void> {
-  const live = process.argv.includes("--live");
-  const runCase = live ? createLiveRunner() : createOfflineRunner();
-  let passed = 0;
-  let totalLatencyMs = 0;
-  const totalUsage = emptyUsage();
-  const total = extractionEvalCases.length;
+  const args = process.argv.slice(2);
+  const mode = parseMode(args);
+  const live = args.includes("--live");
 
-  if (live) {
-    console.log("=================================================================");
-    console.log("  🧪 LIVE EVAL SUITE: LESSON 03 (Document AI Extraction)");
-    console.log("=================================================================");
-  } else {
-    console.log("=================================================================");
-    console.log("  🧪 OFFLINE EVAL SUITE: LESSON 03 (Deterministic Extraction)");
-    console.log("=================================================================");
+  if (!mode || (live && mode === "all")) {
+    console.error(
+      "Usage: run.ts [--mode=mcp|extraction|all] [--live only with extraction or without --mode]",
+    );
+    process.exitCode = 2;
+    return;
   }
 
-  for (const [index, testCase] of extractionEvalCases.entries()) {
-    if (!testCase.expected) {
-      console.log(`\n  ✖  FAIL ${testCase.id}: expected result is missing`);
-      continue;
+  if (live && !args.some((argument) => argument.startsWith("--mode="))) {
+    await runLiveDemo();
+    return;
+  }
+
+  if (mode === "extraction") {
+    await runExtractionEvaluation(live);
+    return;
+  }
+
+  if (mode === "mcp") {
+    if (live) {
+      console.error("Use run.ts --live for the existing live MCP demo.");
+      process.exitCode = 2;
+      return;
     }
 
-    try {
-      if (live) {
-        console.log(`\n-----------------------------------------------------------------`);
-        console.log(`  [${index + 1}/${total}] 🎯 Тест: ${testCase.id}`);
-        console.log(`-----------------------------------------------------------------`);
-        console.log(`  📥 Запит: "${testCase.input}"`);
-        console.log("  ⏳ Очікування відповіді моделі OpenRouter...\n");
-      }
-
-      const observation = await runCase(testCase.id, testCase.input);
-      const score = scoreExtraction(testCase.input, observation.extraction, testCase.expected);
-
-      totalLatencyMs += observation.latencyMs;
-      totalUsage.inputTokens += observation.usage.inputTokens;
-      totalUsage.outputTokens += observation.usage.outputTokens;
-      totalUsage.totalTokens += observation.usage.totalTokens;
-      totalUsage.cachedTokens += observation.usage.cachedTokens;
-      totalUsage.cacheWriteTokens += observation.usage.cacheWriteTokens;
-
-      if (score.passed) {
-        passed += 1;
-        if (!live) {
-          console.log(`  ✔  PASS ${testCase.id}`);
-        }
-      } else {
-        if (!live) {
-          console.log(`  ✖  FAIL ${testCase.id}: ${score.reasons.join(", ")}`);
-        }
-      }
-
-      if (live) {
-        printLiveObservation(observation, score.passed, score.reasons);
-      }
-    } catch (error) {
-      console.log(`\n  ✖  FAIL ${testCase.id}: ⚠️ ${formatRequestFailure(error)}`);
-    }
+    await runRecordedMcpEvaluation();
+    return;
   }
-
-  const successRate = total === 0 ? 0 : passed / total;
-  const averageLatencyMs = total === 0 ? 0 : Math.round(totalLatencyMs / total);
-
-  console.log("\n=================================================================");
-  console.log("  📊 ПІДСУМОК ОЦІНЮВАННЯ (EXTRACTION EVAL REPORT)");
-  console.log("=================================================================");
-  console.log(
-    `  • Результат:           ${passed}/${total} ${passed === total ? "✔ (усі пройдено)" : "✖ (є помилки)"}`,
-  );
-  console.log(`  • Успішність:          ${(successRate * 100).toFixed(1)}%`);
-  console.log(`  • Середня затримка:    ${averageLatencyMs} мс`);
-  console.log(`  • Використано токенів: ${totalUsage.totalTokens}`);
-  console.log("=================================================================\n");
-
-  console.log(`Result: ${passed}/${total}`);
-  console.log(`Success rate: ${(successRate * 100).toFixed(1)}%`);
-  console.log(`Average latency: ${averageLatencyMs}ms`);
-  console.log(
-    `Token usage: input=${totalUsage.inputTokens}, output=${totalUsage.outputTokens}, total=${totalUsage.totalTokens}`,
-  );
-
-  if (successRate < SUCCESS_THRESHOLD) {
-    process.exitCode = 1;
-  }
+  await runExtractionEvaluation(false);
+  await runRecordedMcpEvaluation();
 }
 
 void main();
