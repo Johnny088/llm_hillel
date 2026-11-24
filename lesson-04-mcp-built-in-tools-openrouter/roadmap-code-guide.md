@@ -496,7 +496,7 @@ function isReadTextFileArguments(value: Record<string, unknown>): boolean {
 }
 ```
 
-**Перевірка:** `tests/filesystem-tools.test.ts`. Очікується pass без provider request. Якщо буквальний якір відсутній або перевірка падає, зупиніться на цьому файлі та порівняйте його зі starter; не відновлюйте повний файл з solution.
+**Перевірка:** `yarn vitest tests/filesystem-tools.test.ts`. Очікується pass без provider request. Якщо буквальний якір відсутній або перевірка падає, зупиніться на цьому файлі та порівняйте його зі starter; не відновлюйте повний файл з solution.
 
 #### `my-dev/lesson-04-mcp-built-in-tools-openrouter/tests/filesystem-tools.test.ts`
 
@@ -659,7 +659,7 @@ describe("MCP tool adapter (OpenRouter)", () => {
 });
 ```
 
-**Перевірка:** `tests/filesystem-tools.test.ts`. Очікується pass без provider request. Якщо буквальний якір відсутній або перевірка падає, зупиніться на цьому файлі та порівняйте його зі starter; не відновлюйте повний файл з solution.
+**Перевірка:** `yarn vitest tests/filesystem-tools.test.ts`. Очікується pass без provider request. Якщо буквальний якір відсутній або перевірка падає, зупиніться на цьому файлі та порівняйте його зі starter; не відновлюйте повний файл з solution.
 
 Payloads створюють `src/mcp/filesystem-tools.ts` і `tests/filesystem-tools.test.ts`. До моделі видно лише `read_text_file`; серверний `list_allowed_directories` приховайте. Перед dispatch приймайте `path` і за потреби одне невід'ємне ціле `head` чи `tail`; відхиляйте додаткові keys, malformed JSON, не-object, відсутній/порожній шлях і одночасні head/tail. Перевіряйте allowlist і перед показом schema, і безпосередньо перед MCP dispatch.
 
