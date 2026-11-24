@@ -1464,7 +1464,7 @@ yarn vitest run --dir my-dev/lesson-04-mcp-built-in-tools-openrouter/tests
      async (
 ```
 
-**Перевірка:** `tests/app.test.ts`: preserve all 15 inherited API tests and add four research cases. Очікується pass без provider request. Якщо буквальний якір відсутній або перевірка падає, зупиніться на цьому файлі та порівняйте його зі starter; не відновлюйте повний файл з solution.
+**Перевірка:** `yarn vitest tests/app.test.ts`: preserve all 15 inherited API tests and add four research cases. Очікується pass без provider request. Якщо буквальний якір відсутній або перевірка падає, зупиніться на цьому файлі та порівняйте його зі starter; не відновлюйте повний файл з solution.
 
 #### `my-dev/lesson-04-mcp-built-in-tools-openrouter/src/runtime.ts`
 

@@ -9,8 +9,10 @@ import { DocumentRequestSchema } from "./schemas/document-request.js";
 import type { Extraction } from "./schemas/extraction.js";
 import type { DocumentAi } from "./services/document-ai.js";
 import type { AgentRunResult, ToolCallingAgent } from "./services/tool-calling-agent.js";
+import type { AppDependencies } from "../../../lesson-04-mcp-built-in-tools/starter/src/app.js";
 
-export interface AppDependencies {
+export interface Lesson04AppDependencies extends AppDependencies {
+  mcpAgent?: ToolCallingAgent;
   ai: DocumentAi;
   toolAgent?: ToolCallingAgent;
   now?: () => number;
@@ -67,7 +69,7 @@ function describeStreamFailure(reason: string): { code: string; message: string 
   return { code: "RESPONSE_FAILED", message: "Не вдалося виконати генерацію." };
 }
 
-export function createApp(dependencies: AppDependencies): Express {
+export function createApp(dependencies: Lesson04AppDependencies): Express {
   const app = express();
   const now = dependencies.now ?? (() => performance.now());
   const prices = dependencies.prices ?? MODEL_PRICES;
@@ -78,6 +80,47 @@ export function createApp(dependencies: AppDependencies): Express {
   app.get("/health", (_request, response) => {
     response.json({ status: "ok" });
   });
+
+  app.post(
+    "/api/agent/research",
+    async (
+      request: Request,
+      response: Response<AgentRunResult | ApiErrorResponse>,
+    ): Promise<void> => {
+      const parsedRequest = AgentRequestSchema.safeParse(request.body);
+
+      if (!parsedRequest.success) {
+        response
+          .status(400)
+          .json(
+            createApiError(
+              "INVALID_INPUT",
+              "Невалідний запит.",
+              z.flattenError(parsedRequest.error),
+            ),
+          );
+        return;
+      }
+
+      if (!dependencies.mcpAgent) {
+        response
+          .status(503)
+          .json(createApiError("SERVICE_UNAVAILABLE", "MCP runtime не налаштовано."));
+        return;
+      }
+
+      try {
+        response.json(await dependencies.mcpAgent.run(parsedRequest.data.message));
+      } catch (error: unknown) {
+        console.error("[MCP Agent Error]", {
+          errorName: error instanceof Error ? error.name : "UnknownError",
+        });
+        response
+          .status(502)
+          .json(createApiError("MCP_AGENT_ERROR", "Не вдалося виконати MCP-запит."));
+      }
+    },
+  );
 
   app.post(
     "/api/agent",
