@@ -1054,7 +1054,7 @@ function appendCitationUrls(text: string, citationUrls: string[]): string {
 }
 ```
 
-**Перевірка:** `tests/mcp-web-search-agent.test.ts`. Очікується pass без provider request. Якщо буквальний якір відсутній або перевірка падає, зупиніться на цьому файлі та порівняйте його зі starter; не відновлюйте повний файл з solution.
+**Перевірка:** `yarn vitest tests/mcp-web-search-agent.test.ts`. Очікується pass без provider request. Якщо буквальний якір відсутній або перевірка падає, зупиніться на цьому файлі та порівняйте його зі starter; не відновлюйте повний файл з solution.
 
 #### `my-dev/lesson-04-mcp-built-in-tools-openrouter/tests/mcp-web-search-agent.test.ts`
 
@@ -1369,7 +1369,7 @@ describe("MCP + web search agent (OpenRouter)", () => {
 });
 ```
 
-**Перевірка:** `tests/mcp-web-search-agent.test.ts`. Очікується pass без provider request. Якщо буквальний якір відсутній або перевірка падає, зупиніться на цьому файлі та порівняйте його зі starter; не відновлюйте повний файл з solution.
+**Перевірка:** `yarn vitest tests/mcp-web-search-agent.test.ts`. Очікується pass без provider request. Якщо буквальний якір відсутній або перевірка падає, зупиніться на цьому файлі та порівняйте його зі starter; не відновлюйте повний файл з solution.
 
 Payloads створюють `src/services/mcp-web-search-agent.ts` та `tests/mcp-web-search-agent.test.ts`. Модельний client приймає dependency-injected request/method; тести замінюють і OpenRouter, і MCP mocks. OpenRouter Chat Completions request містить лише filesystem allowlist плюс hosted tool `{ type: "openrouter:web_search", parameters: { max_results: 5, max_uses: 1 } }`, `provider.require_parameters: true`, deterministic temperature та reasoning parameters, якщо модель їх підтримує. `max_uses` не є універсальною квотною гарантією: provider застосування різниться.
 
