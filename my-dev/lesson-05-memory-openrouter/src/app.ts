@@ -6,9 +6,19 @@ import { calculateCacheHitRate, extractUsageMetrics } from "./lib/metrics.js";
 import { sendSseHeaders, writeSseEvent } from "./lib/sse.js";
 import { AgentRequestSchema } from "./schemas/agent-request.js";
 import { DocumentRequestSchema } from "./schemas/document-request.js";
+
 import type { Extraction } from "./schemas/extraction.js";
 import type { DocumentAi } from "./services/document-ai.js";
 import type { AgentRunResult, ToolCallingAgent } from "./services/tool-calling-agent.js";
+
+import {
+  ConversationMessageRequestSchema,
+  ConversationResetRequestSchema,
+} from "./schemas/conversation-request.js";
+import type {
+  ConversationRunResult,
+  ConversationService,
+} from "./services/conversation-manager.js";
 
 export interface AppDependencies {
   ai: DocumentAi;
@@ -19,6 +29,10 @@ export interface AppDependencies {
 
 export interface Lesson04AppDependencies extends AppDependencies {
   mcpAgent?: ToolCallingAgent;
+}
+
+export interface Lesson05OpenRouterAppDependencies extends Lesson04AppDependencies {
+  conversationManager?: ConversationService;
 }
 
 export interface ExtractionApiResponse {
@@ -71,7 +85,7 @@ function describeStreamFailure(reason: string): { code: string; message: string 
   return { code: "RESPONSE_FAILED", message: "Не вдалося виконати генерацію." };
 }
 
-export function createApp(dependencies: Lesson04AppDependencies): Express {
+export function createApp(dependencies: Lesson05OpenRouterAppDependencies): Express {
   const app = express();
   const now = dependencies.now ?? (() => performance.now());
   const prices = dependencies.prices ?? MODEL_PRICES;
@@ -342,6 +356,82 @@ export function createApp(dependencies: Lesson04AppDependencies): Express {
         request.off("aborted", abortIfOpen);
         response.off("close", abortIfOpen);
       }
+    },
+  );
+
+  app.post(
+    "/api/agent/conversation",
+    async (
+      request: Request,
+      response: Response<ConversationRunResult | ApiErrorResponse>,
+    ): Promise<void> => {
+      const parsedRequest = ConversationMessageRequestSchema.safeParse(request.body);
+
+      if (!parsedRequest.success) {
+        response
+          .status(400)
+          .json(
+            createApiError(
+              "INVALID_INPUT",
+              "Невалідний запит.",
+              z.flattenError(parsedRequest.error),
+            ),
+          );
+        return;
+      }
+
+      if (!dependencies.conversationManager) {
+        response
+          .status(503)
+          .json(createApiError("SERVICE_UNAVAILABLE", "Conversation runtime не налаштовано."));
+        return;
+      }
+
+      try {
+        response.json(await dependencies.conversationManager.send(parsedRequest.data));
+      } catch (error: unknown) {
+        console.error("[OpenRouter Conversation Error]", {
+          errorName: error instanceof Error ? error.name : "UnknownError",
+        });
+        response
+          .status(502)
+          .json(createApiError("CONVERSATION_ERROR", "Не вдалося продовжити розмову."));
+      }
+    },
+  );
+
+  app.post(
+    "/api/agent/conversation/reset",
+    (
+      request: Request,
+      response: Response<{ status: "success"; reset: boolean } | ApiErrorResponse>,
+    ): void => {
+      const parsedRequest = ConversationResetRequestSchema.safeParse(request.body);
+
+      if (!parsedRequest.success) {
+        response
+          .status(400)
+          .json(
+            createApiError(
+              "INVALID_INPUT",
+              "Невалідний запит.",
+              z.flattenError(parsedRequest.error),
+            ),
+          );
+        return;
+      }
+
+      if (!dependencies.conversationManager) {
+        response
+          .status(503)
+          .json(createApiError("SERVICE_UNAVAILABLE", "Conversation runtime не налаштовано."));
+        return;
+      }
+
+      response.json({
+        status: "success",
+        reset: dependencies.conversationManager.resetSession(parsedRequest.data.sessionId),
+      });
     },
   );
 

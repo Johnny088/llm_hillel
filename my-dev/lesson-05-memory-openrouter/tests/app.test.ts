@@ -1,3 +1,8 @@
+import type {
+  ConversationRunResult,
+  ConversationService,
+} from "../src/services/conversation-manager.js";
+
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { once } from "node:events";
@@ -564,6 +569,247 @@ describe("POST /api/agent/research (OpenRouter)", () => {
       expect(serializedBody).toContain("MCP_AGENT_ERROR");
       expect(serializedBody).not.toContain("secret-upstream-details");
       expect(errorLog).toHaveBeenCalledWith("[MCP Agent Error]", {
+        errorName: "Error",
+      });
+    } finally {
+      await server.close();
+    }
+  });
+});
+
+const documentAi: DocumentAi = {
+  extract: vi.fn(),
+  async *streamSummary() {
+    return;
+  },
+};
+
+function createSuccessfulRun(): ConversationRunResult {
+  return {
+    status: "success",
+    mode: "session",
+    sessionId: "student-1",
+    text: "Контекст збережено.",
+    model: "configured-model",
+    usage: {
+      inputTokens: 10,
+      outputTokens: 5,
+      totalTokens: 15,
+      cachedTokens: 0,
+      cacheWriteTokens: 0,
+    },
+    metrics: {
+      modelCallCount: 1,
+      toolCallCount: 0,
+      totalLatencyMs: 25,
+    },
+    retainedTurns: 1,
+  };
+}
+
+function createConversationService(): ConversationService {
+  return {
+    send: vi.fn().mockResolvedValue(createSuccessfulRun()),
+    resetSession: vi.fn().mockReturnValue(true),
+  };
+}
+
+async function startServer(
+  conversationManager?: ConversationService,
+): Promise<{ baseUrl: string; close: () => Promise<void> }> {
+  const app = createApp({
+    ai: documentAi,
+    ...(conversationManager === undefined ? {} : { conversationManager }),
+  });
+  const server: Server = app.listen(0);
+  await once(server, "listening");
+  const address = server.address() as AddressInfo;
+
+  return {
+    baseUrl: `http://127.0.0.1:${address.port}`,
+    close: async () => {
+      server.closeAllConnections();
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => {
+          if (error) {
+            reject(error);
+          } else {
+            resolve();
+          }
+        });
+      });
+    },
+  };
+}
+
+async function postConversationJson(
+  baseUrl: string,
+  path: string,
+  body: unknown,
+): Promise<Response> {
+  return fetch(`${baseUrl}${path}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+describe("Lesson 05 OpenRouter app", () => {
+  it("зберігає health endpoint і research route попередніх лекцій", async () => {
+    const server = await startServer();
+
+    try {
+      const healthResponse = await fetch(`${server.baseUrl}/health`);
+      const researchResponse = await postConversationJson(server.baseUrl, "/api/agent/research", {
+        message: "Прочитай notes.txt.",
+      });
+
+      expect(healthResponse.status).toBe(200);
+      await expect(healthResponse.json()).resolves.toEqual({ status: "ok" });
+      expect(researchResponse.status).toBe(503);
+      await expect(researchResponse.json()).resolves.toMatchObject({
+        error: { code: "SERVICE_UNAVAILABLE" },
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("валідує discriminated request до запуску Conversation Manager", async () => {
+    const manager = createConversationService();
+    const server = await startServer(manager);
+
+    try {
+      const response = await postConversationJson(server.baseUrl, "/api/agent/conversation", {
+        mode: "session",
+        message: "Відсутній sessionId.",
+      });
+
+      expect(response.status).toBe(400);
+      expect(manager.send).not.toHaveBeenCalled();
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("передає нормалізований session-запит сервісу", async () => {
+    const manager = createConversationService();
+    const server = await startServer(manager);
+
+    try {
+      const response = await postConversationJson(server.baseUrl, "/api/agent/conversation", {
+        mode: "session",
+        sessionId: " student-1 ",
+        message: "  Продовжити розмову.  ",
+      });
+
+      expect(response.status).toBe(200);
+      expect(manager.send).toHaveBeenCalledWith({
+        mode: "session",
+        sessionId: "student-1",
+        message: "Продовжити розмову.",
+      });
+      await expect(response.json()).resolves.toMatchObject({
+        mode: "session",
+        retainedTurns: 1,
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("очищає короткочасну session history через окремий endpoint", async () => {
+    const manager = createConversationService();
+    const server = await startServer(manager);
+
+    try {
+      const response = await postConversationJson(server.baseUrl, "/api/agent/conversation/reset", {
+        sessionId: "student-1",
+      });
+
+      expect(response.status).toBe(200);
+      expect(manager.resetSession).toHaveBeenCalledWith("student-1");
+      await expect(response.json()).resolves.toEqual({
+        status: "success",
+        reset: true,
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("відхиляє невалідний reset без виклику Conversation Manager", async () => {
+    const manager = createConversationService();
+    const server = await startServer(manager);
+
+    try {
+      const response = await postConversationJson(server.baseUrl, "/api/agent/conversation/reset", {
+        sessionId: " ",
+      });
+
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toMatchObject({
+        error: { code: "INVALID_INPUT" },
+      });
+      expect(manager.resetSession).not.toHaveBeenCalled();
+      expect(manager.send).not.toHaveBeenCalled();
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("повертає 503 для reset без Conversation runtime", async () => {
+    const server = await startServer();
+
+    try {
+      const response = await postConversationJson(server.baseUrl, "/api/agent/conversation/reset", {
+        sessionId: "student-1",
+      });
+
+      expect(response.status).toBe(503);
+      await expect(response.json()).resolves.toMatchObject({
+        error: { code: "SERVICE_UNAVAILABLE" },
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("повертає 503, якщо Conversation runtime не налаштовано", async () => {
+    const server = await startServer();
+
+    try {
+      const response = await postConversationJson(server.baseUrl, "/api/agent/conversation", {
+        mode: "conversation",
+        message: "Створити Conversation.",
+      });
+
+      expect(response.status).toBe(503);
+      await expect(response.json()).resolves.toMatchObject({
+        error: { code: "SERVICE_UNAVAILABLE" },
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("маскує внутрішню помилку Conversation runtime", async () => {
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const manager = createConversationService();
+    vi.mocked(manager.send).mockRejectedValue(new Error("secret-upstream-details"));
+    const server = await startServer(manager);
+
+    try {
+      const response = await postConversationJson(server.baseUrl, "/api/agent/conversation", {
+        mode: "conversation",
+        message: "Продовжити Conversation.",
+      });
+      const serializedBody = JSON.stringify(await response.json());
+
+      expect(response.status).toBe(502);
+      expect(serializedBody).toContain("CONVERSATION_ERROR");
+      expect(serializedBody).not.toContain("secret-upstream-details");
+      expect(errorLog).toHaveBeenCalledWith("[OpenRouter Conversation Error]", {
         errorName: "Error",
       });
     } finally {
