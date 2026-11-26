@@ -1,36 +1,25 @@
-# Lesson 05 OpenRouter – успадкований starter
+# Lesson 05 OpenRouter – памʼять розмови
 
-Цей starter є готовою основою Lesson 04 OpenRouter. Він проходить успадковані тести й не містить штучних `TODO` чи HTTP 501-заглушок Lesson 05. Зелений baseline підтверджує лише стару функціональність, а не завершення нової практики.
+Застосунок зберігає успадковані маршрути практики 04. `POST /api/agent/conversation` продовжує окрему сесію або збережену розмову. `POST /api/agent/conversation/reset` очищає вказану сесію.
 
-## Що вже успадковано
+## Перевірити роботу
 
-Усі 51 успадковані файли збігаються за шляхом і байтами з поточним Git-відстежуваним `lesson-04-mcp-built-in-tools-openrouter/solution`. Єдиний виняток у наборі starter – цей `README.md`. Успадковані HTTP та MCP маршрути, конфігурація, тести, evals і sandbox уже працюють.
-
-У starter ще немає жодного Lesson 05 route, conversation manager, history store, user-fact store, memory test чи memory eval. Усі такі файли створюються під час практики.
-
-## Запустити готову основу
-
-Команди виконуються з кореня клонованого репозиторію, де розташований `package.json`.
+Відкрийте термінал в корені репозиторію, де лежить `package.json`.
 
 ```powershell
-yarn dev:lesson05:openrouter:solution
+yarn student:check 05 openrouter
 ```
 
-Точний HTTP приклад і поведінка memory наведені в [README практики](../README.md). Запуск еталона потребує кореневого `.env` з `OPENROUTER_API_KEY` і звертається до налаштованої моделі.
+Очікується `PASS student:check 05 openrouter`. Команда перевіряє вашу копію, запускає незалежні тести проти вашого коду, відтворює записані сценарії та збирає застосунок.
 
-## Перевірити початковий стан
+## Перевірити маршрути локально
 
 ```powershell
-yarn verify:lesson05:openrouter:scaffolding
-yarn test:lesson05:openrouter
-yarn eval:lesson05:openrouter
-yarn build:lesson05:openrouter:starter
+node scripts/run-tsx-entrypoint.mjs my-dev/lesson-05-memory-openrouter/scripts/smoke-conversation-api.ts
 ```
 
-Перший gate звіряє starter зі спадковою Git-відстежуваною поверхнею. Тести й записаний eval перевіряють успадковану основу; вони не звертаються до провайдера. `yarn verify:lesson05:openrouter` запускає completion gate на канонічному starter і має відхилити його через відсутні файли Lesson 05. Це очікувана негативна перевірка.
+Скрипт використовує підставну відповідь менеджера розмови, перевіряє HTTP-відповіді й завершує сервер.
 
-## Продовжити у власній папці
+## Де зберігаються дані
 
-Одноразово створіть окрему копію starter командою `yarn student:init 05 openrouter`, що підготує `my-dev/lesson-05-memory-openrouter/`. Далі виконуйте кроки [roadmap](../roadmap-code-guide.md). Не редагуйте `starter/` чи `solution/`. Roadmap створює всі нові source-файли, JSON схеми, маршрути й runtime wiring, тести, evals та синтетичні приклади, а після кожного кроку запускає вказану перевірку.
-
-Після завершення виконайте `yarn check:my:lesson05:openrouter`. Completion gate перевіряє фактичний код у `my-dev/lesson-05-memory-openrouter/`, а не імпортує еталонне solution.
+Історія зберігається в `data/conversation-history.json`, факти – в `data/user-memory.json`. Файли `*.example.json` показують форму даних. Робочі JSON-файли створюються під час запису й ігноруються Git.
