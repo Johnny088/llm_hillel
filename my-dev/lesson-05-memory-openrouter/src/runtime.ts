@@ -11,10 +11,21 @@ import {
 import { EducationalRateProvider } from "./tools/currency.js";
 import type { Lesson04AppDependencies } from "./app.js";
 import { connectFilesystemMcp } from "./mcp/filesystem-client.js";
+
+import type { LocalMcpClient } from "./mcp/filesystem-client.js";
+
 import {
   McpWebSearchAgent,
   OpenAIMcpChatCompletionsClient,
 } from "./services/mcp-web-search-agent.js";
+
+import type { Lesson05OpenRouterAppDependencies } from "./app.js";
+import { JsonConversationHistoryStore } from "./memory/conversation-history.js";
+import { JsonUserFactStore } from "./memory/user-facts.js";
+import {
+  ConversationManager,
+  OpenRouterConversationChatClient,
+} from "./services/conversation-manager.js";
 
 export interface Lesson04Runtime {
   openai: OpenAI;
@@ -24,6 +35,19 @@ export interface Lesson04Runtime {
 
 export interface Lesson04RuntimeOptions {
   allowedDirectory?: string;
+
+  createFilesystemMcpClient?: (sandboxPath: string) => Promise<LocalMcpClient>;
+}
+
+export interface Lesson05OpenRouterRuntime extends Lesson04Runtime {
+  dependencies: Lesson05OpenRouterAppDependencies;
+  conversationManager: ConversationManager;
+}
+
+export interface Lesson05OpenRouterRuntimeOptions extends Lesson04RuntimeOptions {
+  userFactsPath?: string;
+  conversationHistoryPath?: string;
+  maxHistoryTurns?: number;
 }
 
 export async function createLesson04Runtime(
@@ -58,7 +82,9 @@ export async function createLesson04Runtime(
   );
   const moduleDirectory = dirname(fileURLToPath(import.meta.url));
   const allowedDirectory = resolve(moduleDirectory, options.allowedDirectory ?? "../sandbox");
-  const mcpClient = await connectFilesystemMcp(allowedDirectory);
+
+  const createMcpClient = options.createFilesystemMcpClient ?? connectFilesystemMcp;
+  const mcpClient = await createMcpClient(allowedDirectory);
 
   try {
     const mcpChatClient = new OpenAIMcpChatCompletionsClient(openai, {
@@ -88,5 +114,55 @@ export async function createLesson04Runtime(
   } catch {
     await mcpClient.close().catch(() => undefined);
     throw new Error("Не вдалося налаштувати локальний MCP runtime.");
+  }
+}
+
+export async function createLesson05Runtime(
+  environment: Environment,
+  options: Lesson05OpenRouterRuntimeOptions = {},
+): Promise<Lesson05OpenRouterRuntime> {
+  const lesson04Runtime = await createLesson04Runtime(environment, {
+    ...(options.allowedDirectory === undefined
+      ? {}
+      : { allowedDirectory: options.allowedDirectory }),
+    ...(options.createFilesystemMcpClient === undefined
+      ? {}
+      : { createFilesystemMcpClient: options.createFilesystemMcpClient }),
+  });
+
+  try {
+    const moduleDirectory = dirname(fileURLToPath(import.meta.url));
+    const userFactsPath =
+      options.userFactsPath ?? resolve(moduleDirectory, "../data", "user-memory.json");
+    const conversationHistoryPath =
+      options.conversationHistoryPath ??
+      resolve(moduleDirectory, "../data", "conversation-history.json");
+    const conversationClient = new OpenRouterConversationChatClient(
+      lesson04Runtime.openai,
+      {
+        modelName: resolveModel("main", environment),
+        maxOutputTokens: environment.OPENROUTER_MAX_OUTPUT_TOKENS,
+        reasoningEffort: environment.OPENROUTER_REASONING_EFFORT,
+      },
+      new JsonUserFactStore(userFactsPath),
+    );
+    const conversationManager = new ConversationManager(
+      conversationClient,
+      new JsonConversationHistoryStore(conversationHistoryPath),
+      options.maxHistoryTurns === undefined ? {} : { maxHistoryTurns: options.maxHistoryTurns },
+    );
+
+    return {
+      openai: lesson04Runtime.openai,
+      dependencies: {
+        ...lesson04Runtime.dependencies,
+        conversationManager,
+      },
+      conversationManager,
+      close: lesson04Runtime.close,
+    };
+  } catch (error: unknown) {
+    await lesson04Runtime.close().catch(() => undefined);
+    throw error;
   }
 }
