@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "sourceMap": true,
+    "rootDir": ".",
+    "outDir": "./dist/lesson-05-memory-openrouter"
+  },
+  "include": ["lesson-05-memory-openrouter/solution/src/**/*.ts"],
+  "exclude": ["lesson-05-memory-openrouter/solution/tests/**/*.ts"]
+}
