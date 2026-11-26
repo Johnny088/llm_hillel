@@ -1,9 +1,75 @@
 import { describe, expect, it } from "vitest";
-import { mcpToolEvalCases } from "../evals/mcp-tools.eval.js";
-import { recordedMcpToolResults } from "../evals/recorded-results.js";
-import { recordedResults } from "../evals/recorded-results.js";
-import { scoreExtraction, scoreMcpToolCase } from "../evals/scorer.js";
+
 import { extractionEvalCases } from "../evals/extraction.eval.js";
+
+import { mcpToolEvalCases } from "../evals/mcp-tools.eval.js";
+import { longTermMemoryEvalCases, memoryEvalCases } from "../evals/memory.eval.js";
+import {
+  recordedLongTermMemoryResults,
+  recordedMemoryResults,
+  recordedMcpToolResults,
+  recordedResults,
+} from "../evals/recorded-results.js";
+import {
+  scoreExtraction,
+  scoreLongTermMemoryCase,
+  scoreMemoryCase,
+  scoreMcpToolCase,
+} from "../evals/scorer.js";
+
+describe("Lesson 05 OpenRouter memory evals", () => {
+  it("містить п’ять унікальних сценаріїв для двох механізмів стану", () => {
+    expect(memoryEvalCases).toHaveLength(5);
+    expect(new Set(memoryEvalCases.map((evalCase) => evalCase.id)).size).toBe(5);
+    expect(memoryEvalCases.filter((evalCase) => evalCase.expected.mode === "session")).toHaveLength(
+      3,
+    );
+    expect(
+      memoryEvalCases.filter((evalCase) => evalCase.expected.mode === "conversation"),
+    ).toHaveLength(2);
+    expect(memoryEvalCases.every((evalCase) => evalCase.expected.windowingEnabled)).toBe(true);
+  });
+
+  it("містить п’ять Long-term Memory сценаріїв з позитивними й негативними кейсами", () => {
+    expect(longTermMemoryEvalCases.map((evalCase) => evalCase.id)).toEqual([
+      "in-session-recall",
+      "session-reset",
+      "long-term-persistence",
+      "no-false-tool-invocation",
+      "sensitive-data-refusal",
+    ]);
+    expect(
+      longTermMemoryEvalCases.find((evalCase) => evalCase.id === "long-term-persistence")?.expected
+        .persistsUserFact,
+    ).toBe(true);
+    expect(
+      longTermMemoryEvalCases.find((evalCase) => evalCase.id === "sensitive-data-refusal")?.expected
+        .refusesSensitiveData,
+    ).toBe(true);
+  });
+
+  it("проходить deterministic recorded replay", () => {
+    const observationsById = new Map(
+      recordedMemoryResults.map((observation) => [observation.id, observation]),
+    );
+    const scores = memoryEvalCases.map((evalCase) => {
+      const observation = observationsById.get(evalCase.id);
+      if (!observation) throw new Error(`Відсутнє спостереження для ${evalCase.id}.`);
+      return scoreMemoryCase(evalCase, observation);
+    });
+    const longTermObservationsById = new Map(
+      recordedLongTermMemoryResults.map((observation) => [observation.id, observation]),
+    );
+    const longTermScores = longTermMemoryEvalCases.map((evalCase) => {
+      const observation = longTermObservationsById.get(evalCase.id);
+      if (!observation) throw new Error(`Відсутнє спостереження для ${evalCase.id}.`);
+      return scoreLongTermMemoryCase(evalCase, observation);
+    });
+
+    expect(scores.every((score) => score.passed)).toBe(true);
+    expect(longTermScores.every((score) => score.passed)).toBe(true);
+  });
+});
 
 describe("Lesson 04 MCP routing evals (OpenRouter)", () => {
   it("містить два MCP, два web і один refusal сценарій", () => {

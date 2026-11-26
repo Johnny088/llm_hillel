@@ -1,7 +1,97 @@
+import type { LongTermMemoryEvalCase, MemoryEvalCase } from "./memory.eval.js";
+import type { LongTermMemoryObservation, MemoryObservation } from "./recorded-results.js";
+import type { Extraction } from "../src/schemas/extraction.js";
+import { ExtractionSchema } from "../src/schemas/extraction.js";
+import type { ExtractionEvalExpected } from "./extraction.eval.js";
+
 import type { McpEvalCase } from "./mcp-tools.eval.js";
 import type { McpToolObservation } from "./recorded-results.js";
-import { ExtractionSchema, type Extraction } from "../src/schemas/extraction.js";
-import type { ExtractionEvalExpected } from "./extraction.eval.js";
+
+export interface MemoryEvalScore {
+  id: string;
+  passed: boolean;
+  reasons: string[];
+}
+
+export function scoreMemoryCase(
+  evalCase: MemoryEvalCase,
+  observation: MemoryObservation,
+): MemoryEvalScore {
+  const reasons: string[] = [];
+
+  compare(reasons, "mode", observation.mode, evalCase.expected.mode);
+  compare(
+    reasons,
+    "usesClientManagedHistory",
+    observation.usedClientManagedHistory,
+    evalCase.expected.usesClientManagedHistory,
+  );
+  compare(
+    reasons,
+    "createsDurableConversation",
+    observation.createdDurableConversation,
+    evalCase.expected.createsDurableConversation,
+  );
+  compare(
+    reasons,
+    "windowingEnabled",
+    observation.windowingEnabled,
+    evalCase.expected.windowingEnabled,
+  );
+
+  return { id: evalCase.id, passed: reasons.length === 0, reasons };
+}
+
+export function scoreLongTermMemoryCase(
+  evalCase: LongTermMemoryEvalCase,
+  observation: LongTermMemoryObservation,
+): MemoryEvalScore {
+  const reasons: string[] = [];
+
+  compare(
+    reasons,
+    "usesClientManagedHistory",
+    observation.usedClientManagedHistory,
+    evalCase.expected.usesClientManagedHistory,
+  );
+  compare(
+    reasons,
+    "resetsShortTermState",
+    observation.resetShortTermState,
+    evalCase.expected.resetsShortTermState,
+  );
+  compare(
+    reasons,
+    "invokesSaveUserFactTool",
+    observation.invokedSaveUserFactTool,
+    evalCase.expected.invokesSaveUserFactTool,
+  );
+  compare(
+    reasons,
+    "persistsUserFact",
+    observation.persistedUserFact,
+    evalCase.expected.persistsUserFact,
+  );
+  compare(
+    reasons,
+    "refusesSensitiveData",
+    observation.refusedSensitiveData,
+    evalCase.expected.refusesSensitiveData,
+  );
+
+  return { id: evalCase.id, passed: reasons.length === 0, reasons };
+}
+
+function compare(
+  reasons: string[],
+  label: string,
+  actual: string | boolean,
+  expected: string | boolean,
+): void {
+  if (actual !== expected) {
+    reasons.push(`Очікувався ${label}=${expected}, отримано ${actual}.`);
+  }
+}
 
 export interface EvalScore {
   passed: boolean;

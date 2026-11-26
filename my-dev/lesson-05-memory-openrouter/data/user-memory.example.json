@@ -1,0 +1,12 @@
+{
+  "facts": [
+    {
+      "category": "displayName",
+      "value": "Олена"
+    },
+    {
+      "category": "preferredStack",
+      "value": "TypeScript та Node.js"
+    }
+  ]
+}

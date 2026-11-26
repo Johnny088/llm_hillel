@@ -1,0 +1,12 @@
+{
+  "conversations": {
+    "synthetic-conversation-id": [
+      {
+        "userMessage": "Який стек вивчається?",
+        "assistantMessage": {
+          "content": "TypeScript та Node.js."
+        }
+      }
+    ]
+  }
+}
