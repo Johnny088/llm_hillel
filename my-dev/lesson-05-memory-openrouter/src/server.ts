@@ -4,12 +4,15 @@ import { createApp } from "./app.js";
 import { loadEnvironment, loadRepositoryEnvFile } from "./config/env.js";
 import type { Environment } from "./config/env.js";
 import { createLesson04Runtime } from "./runtime.js";
-import type { Lesson04Runtime } from "./runtime.js";
+import { createLesson05Runtime } from "./runtime.js";
+import type { Lesson04Runtime, Lesson05OpenRouterRuntime } from "./runtime.js";
 
 export interface Lesson04ServerHandle {
   server: Server;
   close(): Promise<void>;
 }
+
+export type Lesson05ServerHandle = Lesson04ServerHandle;
 
 type RuntimeFactory = (environment: Environment) => Promise<Lesson04Runtime>;
 
@@ -91,6 +94,15 @@ export async function startLesson04Server(
   return { server, close };
 }
 
+export function startLesson05Server(
+  environment: Environment,
+  createRuntime: (
+    environment: Environment,
+  ) => Promise<Lesson05OpenRouterRuntime> = createLesson05Runtime,
+): Promise<Lesson05ServerHandle> {
+  return startLesson04Server(environment, createRuntime);
+}
+
 async function closeHttpServer(server: Server): Promise<void> {
   if (!server.listening) {
     return;
@@ -111,10 +123,10 @@ async function closeHttpServer(server: Server): Promise<void> {
 async function main(): Promise<void> {
   loadRepositoryEnvFile();
   const environment = loadEnvironment(process.env);
-  const handle = await startLesson04Server(environment);
+  const handle = await startLesson05Server(environment);
 
   console.log(
-    `Document, Tool та MCP (OpenRouter) API працює на http://localhost:${environment.PORT}`,
+    `Document, Tool, MCP та Conversation (OpenRouter) API працює на http://localhost:${environment.PORT}`,
   );
 
   const shutdown = (): void => {
